@@ -5,6 +5,7 @@ import io.podradar.sdk.internal.JsonReader;
 import io.podradar.sdk.internal.JsonWriter;
 import io.podradar.sdk.internal.Multipart;
 import io.podradar.sdk.internal.SdkConfig;
+import io.podradar.sdk.internal.Urls;
 import io.podradar.sdk.model.BatchSearchAsyncResponse;
 import io.podradar.sdk.model.BatchSearchRequest;
 import io.podradar.sdk.model.BatchUploadRequest;
@@ -23,8 +24,6 @@ import io.podradar.sdk.model.WriteJobItemsResponse;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -261,11 +260,7 @@ public final class PodRadarAsyncClient implements AutoCloseable {
     }
 
     private static String urlEncode(String s) {
-        try {
-            return URLEncoder.encode(s, StandardCharsets.UTF_8.name());
-        } catch (java.io.UnsupportedEncodingException e) {
-            throw new AssertionError("UTF-8 is always supported", e);
-        }
+        return Urls.encode(s);
     }
 
     private static <T> CompletableFuture<T> failed(Throwable t) {

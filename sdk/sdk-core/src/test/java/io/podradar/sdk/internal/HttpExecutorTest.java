@@ -133,4 +133,37 @@ class HttpExecutorTest {
         String body = exec.getJsonAsync("/api/v1/a").get();
         assertEquals("{\"ok\":true}", body);
     }
+
+    @Test
+    void asyncWorksAgainAfterClose() throws Exception {
+        // close() 只释放空闲线程；之后的异步调用惰性重建线程池——wrap() 会让多个
+        // client 共享同一个 executor，关掉其中一个不能永久废掉其余的异步能力。
+        server.stubFor(get(urlEqualTo("/api/v1/r"))
+                .willReturn(aResponse().withStatus(200).withBody("{\"ok\":true}")));
+        assertEquals("{\"ok\":true}", exec.getJsonAsync("/api/v1/r").get());
+        exec.close();
+        assertEquals("{\"ok\":true}", exec.getJsonAsync("/api/v1/r").get());
+    }
+
+    @Test
+    void slowDripBodyIsBoundedByRequestTimeout() {
+        // 服务端慢慢滴漏 body（每次 read 都不超过单次读超时）也必须被
+        // requestTimeout 的全程 deadline 兜住，不能拖满整个滴漏时长。
+        SdkConfig cfg = SdkConfig.builder()
+                .endpoint("http://localhost:" + server.port())
+                .apiKey("k")
+                .requestTimeout(Duration.ofMillis(500))
+                .build();
+        HttpExecutor fast = new HttpExecutor(cfg);
+        server.stubFor(get(urlEqualTo("/api/v1/slow"))
+                .willReturn(aResponse().withStatus(200)
+                        .withBody("x".repeat(64 * 1024))
+                        .withChunkedDribbleDelay(50, 10_000)));
+        long start = System.nanoTime();
+        assertThrows(io.podradar.sdk.error.PodRadarNetworkException.class,
+                () -> fast.getJson("/api/v1/slow"));
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+        assertTrue(elapsedMs < 5_000,
+                "should abort well before the 10s dribble completes, took " + elapsedMs + "ms");
+    }
 }

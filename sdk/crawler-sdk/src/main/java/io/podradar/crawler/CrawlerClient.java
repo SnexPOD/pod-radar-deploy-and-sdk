@@ -22,11 +22,10 @@ import io.podradar.sdk.internal.Json;
 import io.podradar.sdk.internal.JsonReader;
 import io.podradar.sdk.internal.JsonWriter;
 import io.podradar.sdk.internal.SdkConfig;
+import io.podradar.sdk.internal.Urls;
 import io.podradar.sdk.model.PageQuery;
 
 import java.net.URI;
-import java.net.URLEncoder;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -182,11 +181,7 @@ public final class CrawlerClient implements AutoCloseable {
     }
 
     private static String urlEncode(String s) {
-        try {
-            return URLEncoder.encode(s, StandardCharsets.UTF_8.name());
-        } catch (java.io.UnsupportedEncodingException e) {
-            throw new AssertionError("UTF-8 is always supported", e);
-        }
+        return Urls.encode(s);
     }
 
     /** Returns the read-only effective config. */

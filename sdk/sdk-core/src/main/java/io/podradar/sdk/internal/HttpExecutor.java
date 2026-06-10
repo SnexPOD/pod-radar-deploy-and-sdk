@@ -7,8 +7,10 @@ import io.podradar.sdk.error.PodRadarServerException;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.net.HttpURLConnection;
+import java.net.SocketTimeoutException;
 import java.net.URI;
 import java.net.URL;
 import java.nio.charset.StandardCharsets;
@@ -18,6 +20,7 @@ import java.util.Map;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * Thin wrapper around {@link java.net.HttpURLConnection} (Java 8 compatible; zero
@@ -124,6 +127,15 @@ public final class HttpExecutor {
                 }
                 throw ex;
             } catch (IOException e) {
+                // Thread interruption surfaces as InterruptedIOException here (SocketTimeout-
+                // Exception is its subclass but means a timeout, not cancellation) — abort
+                // immediately instead of burning the retry budget, mirroring the old
+                // java.net.http behavior of failing fast on InterruptedException.
+                if (Thread.currentThread().isInterrupted()
+                        || (e instanceof InterruptedIOException && !(e instanceof SocketTimeoutException))) {
+                    Thread.currentThread().interrupt();
+                    throw new PodRadarNetworkException("interrupted", e);
+                }
                 if (i < attempts - 1) {
                     sleepBackoff(i);
                     continue;
@@ -138,13 +150,19 @@ public final class HttpExecutor {
 
     private CompletableFuture<String> executeAsync(Request req) {
         CompletableFuture<String> future = new CompletableFuture<>();
-        pool().execute(() -> {
-            try {
-                future.complete(execute(req));
-            } catch (Throwable t) {
-                future.completeExceptionally(t);
-            }
-        });
+        try {
+            pool().execute(() -> {
+                try {
+                    future.complete(execute(req));
+                } catch (Throwable t) {
+                    future.completeExceptionally(t);
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            // close() raced this submission — fail the future instead of throwing
+            // synchronously, so async callers always get their error via the future.
+            future.completeExceptionally(new PodRadarNetworkException("client closed", e));
+        }
         return future;
     }
 
@@ -156,9 +174,12 @@ public final class HttpExecutor {
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod(req.method);
         conn.setConnectTimeout((int) Math.min(cfg.connectTimeout().toMillis(), Integer.MAX_VALUE));
-        // Closest Java 8 analog of java.net.http's per-request timeout: caps each
-        // blocking read, not the whole exchange.
+        // setReadTimeout caps each blocking read; the whole-exchange bound (the old
+        // java.net.http HttpRequest.timeout semantics) is enforced by the deadline
+        // check in readAll() — a slow-dripping server cannot stretch a request far
+        // beyond cfg.requestTimeout().
         conn.setReadTimeout((int) Math.min(cfg.requestTimeout().toMillis(), Integer.MAX_VALUE));
+        long deadlineNanos = System.nanoTime() + cfg.requestTimeout().toNanos();
         conn.setInstanceFollowRedirects(false);
         conn.setRequestProperty("X-API-Key", cfg.apiKey());
         conn.setRequestProperty("User-Agent", cfg.userAgent());
@@ -178,18 +199,21 @@ public final class HttpExecutor {
 
         int status = conn.getResponseCode();
         InputStream in = status >= 400 ? conn.getErrorStream() : conn.getInputStream();
-        String body = in == null ? "" : readAll(in);
+        String body = in == null ? "" : readAll(in, deadlineNanos);
         Map<String, List<String>> headers = conn.getHeaderFields();
         return new Response(status, headers == null ? Collections.emptyMap() : headers, body);
     }
 
-    private static String readAll(InputStream in) throws IOException {
+    private static String readAll(InputStream in, long deadlineNanos) throws IOException {
         try {
             ByteArrayOutputStream buf = new ByteArrayOutputStream();
             byte[] chunk = new byte[8192];
             int n;
             while ((n = in.read(chunk)) != -1) {
                 buf.write(chunk, 0, n);
+                if (System.nanoTime() - deadlineNanos > 0) {
+                    throw new SocketTimeoutException("request timeout exceeded while reading response body");
+                }
             }
             return new String(buf.toByteArray(), StandardCharsets.UTF_8);
         } finally {
@@ -211,9 +235,12 @@ public final class HttpExecutor {
 
     private ExecutorService pool() {
         ExecutorService p = asyncPool;
-        if (p == null) {
+        if (p == null || p.isShutdown()) {
             synchronized (this) {
-                if (asyncPool == null) {
+                // Recreate after close(): the executor may be shared across a sync
+                // client and async wrappers (wrap()), so closing one must not
+                // permanently break the others — mirrors the old no-op close().
+                if (asyncPool == null || asyncPool.isShutdown()) {
                     asyncPool = Executors.newCachedThreadPool(r -> {
                         Thread t = new Thread(r, "podradar-sdk-async");
                         t.setDaemon(true);
@@ -226,7 +253,11 @@ public final class HttpExecutor {
         return p;
     }
 
-    /** Shuts down the async pool if it was ever created. Sync calls remain usable. */
+    /**
+     * Releases the async pool's threads if one was ever created. Sync calls remain
+     * usable, and a later async call lazily recreates the pool (threads are daemon,
+     * so even an un-closed executor never blocks JVM exit).
+     */
     public void close() {
         ExecutorService p = asyncPool;
         if (p != null) {
