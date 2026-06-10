@@ -9,7 +9,6 @@ import io.podradar.sdk.error.PodRadarServerException;
 import io.podradar.sdk.error.PodRadarValidationException;
 import org.junit.jupiter.api.Test;
 
-import java.net.http.HttpHeaders;
 import java.util.List;
 import java.util.Map;
 
@@ -17,8 +16,8 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class HttpErrorMapperTest {
 
-    private static HttpHeaders headers(Map<String, List<String>> kv) {
-        return HttpHeaders.of(kv, (a, b) -> true);
+    private static Map<String, List<String>> headers(Map<String, List<String>> kv) {
+        return kv;
     }
 
     @Test
@@ -66,6 +65,15 @@ class HttpErrorMapperTest {
                 "{\"error\":\"slow down\"}");
         assertTrue(ex instanceof PodRadarRateLimitException);
         assertEquals(30L, ((PodRadarRateLimitException) ex).retryAfterSeconds());
+    }
+
+    @Test
+    void retryAfterHeaderLookupIsCaseInsensitive() {
+        // HttpURLConnection's getHeaderFields() preserves wire casing.
+        PodRadarException ex = HttpErrorMapper.map(429,
+                headers(Map.of("retry-after", List.of("7"))),
+                "{\"error\":\"slow down\"}");
+        assertEquals(7L, ((PodRadarRateLimitException) ex).retryAfterSeconds());
     }
 
     @Test

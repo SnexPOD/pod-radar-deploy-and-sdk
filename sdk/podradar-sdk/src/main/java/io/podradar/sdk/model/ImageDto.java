@@ -2,6 +2,7 @@ package io.podradar.sdk.model;
 
 import io.podradar.sdk.internal.Json;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -78,7 +79,7 @@ public final class ImageDto {
                 Json.str(o, "full"),
                 Json.str(o, "status"),
                 o.get("duplicate_of") instanceof Number ? ((Number) o.get("duplicate_of")).longValue() : null,
-                o.containsKey("tags") ? Json.strList(o, "tags") : List.of(),
+                o.containsKey("tags") ? Json.strList(o, "tags") : Collections.emptyList(),
                 Json.str(o, "fetched_at"),
                 Json.str(o, "created_at"));
     }

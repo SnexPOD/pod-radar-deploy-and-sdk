@@ -8,9 +8,9 @@ import io.podradar.sdk.error.PodRadarRateLimitException;
 import io.podradar.sdk.error.PodRadarServerException;
 import io.podradar.sdk.error.PodRadarValidationException;
 
-import java.net.http.HttpHeaders;
 import java.util.Collections;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -23,7 +23,7 @@ import java.util.Map;
 public final class HttpErrorMapper {
     private HttpErrorMapper() {}
 
-    public static PodRadarException map(int statusCode, HttpHeaders headers, String body) {
+    public static PodRadarException map(int statusCode, Map<String, List<String>> headers, String body) {
         String error;
         String requestId;
         Map<String, Object> details;
@@ -71,15 +71,20 @@ public final class HttpErrorMapper {
         }
     }
 
-    private static long parseRetryAfter(HttpHeaders headers) {
+    private static long parseRetryAfter(Map<String, List<String>> headers) {
         if (headers == null) return 0L;
-        return headers.firstValue("Retry-After").map(v -> {
+        // HttpURLConnection's getHeaderFields() preserves wire casing — match case-insensitively.
+        for (Map.Entry<String, List<String>> e : headers.entrySet()) {
+            if (e.getKey() == null || !"Retry-After".equalsIgnoreCase(e.getKey())) continue;
+            List<String> values = e.getValue();
+            if (values == null || values.isEmpty() || values.get(0) == null) return 0L;
             try {
-                return Long.parseLong(v.trim());
+                return Long.parseLong(values.get(0).trim());
             } catch (NumberFormatException ignored) {
                 return 0L;
             }
-        }).orElse(0L);
+        }
+        return 0L;
     }
 
     private static String stringOr(Object v, String fallback) {

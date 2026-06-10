@@ -18,6 +18,7 @@ import java.net.URI;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
@@ -29,7 +30,7 @@ final class ExampleSupport {
     static final int ERR_RATE_LIMIT = 3;
     static final int ERR_VALIDATION = 4;
 
-    private static final Set<String> OPTIONS_WITH_VALUE = Set.of(
+    private static final Set<String> OPTIONS_WITH_VALUE = new HashSet<>(Arrays.asList(
             "--batch",
             "--cursor-start-at",
             "--k",
@@ -55,11 +56,11 @@ final class ExampleSupport {
             "--tags",
             "--text",
             "--title",
-            "--track");
+            "--track"));
 
     static String requiredEnv(String name) {
         String value = System.getenv(name);
-        if (value == null || value.isBlank()) {
+        if (value == null || value.trim().isEmpty()) {
             System.err.println("missing env: " + name);
             System.exit(ERR_USAGE);
         }
@@ -68,7 +69,7 @@ final class ExampleSupport {
 
     static String envOr(String name, String fallback) {
         String value = System.getenv(name);
-        return value == null || value.isBlank() ? fallback : value;
+        return value == null || value.trim().isEmpty() ? fallback : value;
     }
 
     static PodRadarClient.Builder podRadarBuilder() {
@@ -175,9 +176,9 @@ final class ExampleSupport {
         if (!urls.isEmpty()) return urls;
 
         String raw = System.getenv(envName);
-        if (raw != null && !raw.isBlank()) {
+        if (raw != null && !raw.trim().isEmpty()) {
             Arrays.stream(raw.split("[,\\s]+"))
-                    .filter(s -> !s.isBlank())
+                    .filter(s -> !s.trim().isEmpty())
                     .map(URI::create)
                     .forEach(urls::add);
         }

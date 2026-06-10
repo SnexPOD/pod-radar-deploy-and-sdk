@@ -2,6 +2,7 @@ package io.podradar.crawler.model;
 
 import io.podradar.sdk.internal.Json;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -21,6 +22,6 @@ public final class MeResponse {
     public static MeResponse fromJson(Map<String, Object> o) {
         return new MeResponse(
                 Json.str(o, "name"),
-                o.containsKey("scopes") ? Json.strList(o, "scopes") : List.of());
+                o.containsKey("scopes") ? Json.strList(o, "scopes") : Collections.emptyList());
     }
 }

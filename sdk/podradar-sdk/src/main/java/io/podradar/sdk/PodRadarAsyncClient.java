@@ -261,7 +261,11 @@ public final class PodRadarAsyncClient implements AutoCloseable {
     }
 
     private static String urlEncode(String s) {
-        return URLEncoder.encode(s, StandardCharsets.UTF_8);
+        try {
+            return URLEncoder.encode(s, StandardCharsets.UTF_8.name());
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new AssertionError("UTF-8 is always supported", e);
+        }
     }
 
     private static <T> CompletableFuture<T> failed(Throwable t) {
@@ -275,7 +279,7 @@ public final class PodRadarAsyncClient implements AutoCloseable {
 
     @Override
     public void close() {
-        // java.net.http.HttpClient has no explicit close in JDK 11.
+        http.close(); // shuts down the async pool
     }
 
     // ───── Builder ────────────────────────────────────────────────────

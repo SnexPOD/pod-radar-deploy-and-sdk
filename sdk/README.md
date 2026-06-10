@@ -1,7 +1,7 @@
 # pod-radar Java SDK
 
-Java 11+ clients for the pod-radar HTTP API. **Zero runtime dependencies** —
-only `java.net.http.HttpClient` from the JDK. Jar size ≤ 80KB (main) / 60KB
+Java 8 clients for the pod-radar HTTP API. **Zero runtime dependencies** —
+only `java.net.HttpURLConnection` from the JDK. Jar size ≤ 80KB (main) / 60KB
 (crawler).
 
 > **使用文档(权威入口)**: https://podradar.example.com/sdk
@@ -38,11 +38,12 @@ Nexus 配置 + Gradle 写法 + 验证 `mvn dependency:tree` 见 https://podradar
 
 ## 2. 从源码构建(本地开发 / pre-release 测试)
 
-需要 JDK 11+ 和 Maven 3.9+:
+SDK 产物是 Java 8（javac release=8）。构建机需要 JDK 11+ 和 Maven 3.9+（测试代码
+依赖 wiremock 3.x，按 testRelease 11 编译；只随构建跑，不随 jar 交付）:
 
 \`\`\`bash
-cd java_sdk
-mvn -q clean install -DskipTests=false     # 编译 + 跑 21+22+sdk-core 测试 + 装到本地 ~/.m2
+cd sdk
+mvn -q clean install -DskipTests=false     # 编译 + 跑全部单测 + 装到本地 ~/.m2
 \`\`\`
 
 之后业务工程的 `pom.xml` 就能直接引入 `0.1.0`:

@@ -55,7 +55,7 @@ public final class SearchRequest {
     }
 
     public static SearchRequest fromText(String text, int k) {
-        if (text == null || text.isBlank()) throw new IllegalArgumentException("text is empty");
+        if (text == null || text.trim().isEmpty()) throw new IllegalArgumentException("text is empty");
         return new SearchRequest(Mode.TEXT, null, null, null, null, text, k);
     }
 

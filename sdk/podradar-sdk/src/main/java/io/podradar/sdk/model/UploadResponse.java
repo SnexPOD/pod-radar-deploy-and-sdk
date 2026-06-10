@@ -2,6 +2,7 @@ package io.podradar.sdk.model;
 
 import io.podradar.sdk.internal.Json;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 
@@ -33,6 +34,6 @@ public final class UploadResponse {
                 ImageDto.fromJson(Json.obj(o, "image")),
                 Json.bool(o, "created"),
                 Json.integ(o, "queued_count"),
-                o.containsKey("queued_models") ? Json.strList(o, "queued_models") : List.of());
+                o.containsKey("queued_models") ? Json.strList(o, "queued_models") : Collections.emptyList());
     }
 }

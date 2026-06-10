@@ -158,7 +158,7 @@ public final class CrawlerAsyncClient implements AutoCloseable {
 
     @Override
     public void close() {
-        // nothing to release
+        http.close(); // shuts down the async pool
     }
 
     // ───── Builder ────────────────────────────────────────────────────

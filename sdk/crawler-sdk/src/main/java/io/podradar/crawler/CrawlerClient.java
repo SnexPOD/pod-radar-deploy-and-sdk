@@ -173,12 +173,20 @@ public final class CrawlerClient implements AutoCloseable {
         boolean first = true;
         for (Map.Entry<String, String> e : params.entrySet()) {
             if (!first) sb.append('&');
-            sb.append(URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8));
+            sb.append(urlEncode(e.getKey()));
             sb.append('=');
-            sb.append(URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8));
+            sb.append(urlEncode(e.getValue()));
             first = false;
         }
         return sb.toString();
+    }
+
+    private static String urlEncode(String s) {
+        try {
+            return URLEncoder.encode(s, StandardCharsets.UTF_8.name());
+        } catch (java.io.UnsupportedEncodingException e) {
+            throw new AssertionError("UTF-8 is always supported", e);
+        }
     }
 
     /** Returns the read-only effective config. */
@@ -189,7 +197,7 @@ public final class CrawlerClient implements AutoCloseable {
 
     @Override
     public void close() {
-        // java.net.http.HttpClient has no explicit close in JDK 11.
+        http.close(); // shuts down the async pool if one was ever created
     }
 
     // ───── Builder ────────────────────────────────────────────────────

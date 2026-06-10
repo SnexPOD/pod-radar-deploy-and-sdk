@@ -8,7 +8,7 @@ crawler-sdk-0.1.0.jar
 
 ## 环境
 
-需要 JDK 11+。
+需要 JDK 8+。
 
 ```bash
 export CRAWLER_ENDPOINT="http://10.10.131.205"   # 爬虫后端地址（crawler-api，默认 :3002 / 反代后的对外地址）

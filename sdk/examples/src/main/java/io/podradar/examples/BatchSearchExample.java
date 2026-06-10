@@ -11,6 +11,7 @@ import io.podradar.sdk.model.SearchJobStatus;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -25,7 +26,7 @@ import java.util.List;
 public final class BatchSearchExample {
 
     public static void main(String[] args) throws InterruptedException {
-        List<URI> urls = ExampleSupport.urlsFromArgsOrEnv(args, "POD_RADAR_SEARCH_URLS", List.of());
+        List<URI> urls = ExampleSupport.urlsFromArgsOrEnv(args, "POD_RADAR_SEARCH_URLS", Collections.emptyList());
         if (urls.isEmpty()) {
             System.err.println("provide URLs as args or POD_RADAR_SEARCH_URLS");
             System.exit(ExampleSupport.ERR_USAGE);

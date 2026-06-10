@@ -49,7 +49,7 @@ public final class ImageSearchDemo {
 
     private static String requireEnv(String name) {
         String v = System.getenv(name);
-        if (v == null || v.isBlank()) throw new IllegalStateException("missing env: " + name);
+        if (v == null || v.trim().isEmpty()) throw new IllegalStateException("missing env: " + name);
         return v;
     }
 

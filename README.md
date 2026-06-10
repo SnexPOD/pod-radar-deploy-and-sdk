@@ -29,7 +29,7 @@ docker compose -f compose.yml up -d
 ## SDK
 
 - **现成 jar + Demo**：见 `<场景>/sdk-dist/`（含 `README.md` 编译运行说明）。两个 SDK 各是一个自包含 jar，直接 `javac -cp <jar>` 即可。
-- **源码**：[`sdk/`](sdk/) 是两个 SDK 的完整源码（`sdk-core` / `podradar-sdk` / `crawler-sdk` / `examples`），可自行 `cd sdk && mvn -q clean install` 构建（JDK 11+ / Maven 3.9+）。
+- **源码**：[`sdk/`](sdk/) 是两个 SDK 的完整源码（`sdk-core` / `podradar-sdk` / `crawler-sdk` / `examples`），可自行 `cd sdk && mvn -q clean install` 构建（产物 Java 8；构建机 JDK 11+ / Maven 3.9+）。
 
 ## 来源
 

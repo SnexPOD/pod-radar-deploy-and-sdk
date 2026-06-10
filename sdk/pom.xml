@@ -20,8 +20,11 @@
     </modules>
 
     <properties>
-        <maven.compiler.source>11</maven.compiler.source>
-        <maven.compiler.target>11</maven.compiler.target>
+        <!-- SDK 是 Java 8 项目（javac release=8 强制校验 API 面，产物 class 52.0）。
+             测试代码用 testRelease 11：wiremock 3.x 需要 Java 11+ 字节码，且测试只在
+             现代 JDK 上跑，不随 jar 交付。 -->
+        <maven.compiler.release>8</maven.compiler.release>
+        <maven.compiler.testRelease>11</maven.compiler.testRelease>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <junit.version>5.10.2</junit.version>

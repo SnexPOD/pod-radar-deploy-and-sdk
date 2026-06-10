@@ -4,104 +4,99 @@ import io.podradar.sdk.error.PodRadarException;
 import io.podradar.sdk.error.PodRadarNetworkException;
 import io.podradar.sdk.error.PodRadarServerException;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.HttpURLConnection;
 import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
+import java.net.URL;
 import java.nio.charset.StandardCharsets;
+import java.util.Collections;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 /**
- * Thin wrapper around {@link java.net.http.HttpClient}. Adds X-API-Key + User-Agent,
- * unwraps non-2xx responses via {@link HttpErrorMapper}, and optionally retries on
- * {@link PodRadarServerException} with exponential backoff.
+ * Thin wrapper around {@link java.net.HttpURLConnection} (Java 8 compatible; zero
+ * runtime dependencies). Adds X-API-Key + User-Agent, unwraps non-2xx responses via
+ * {@link HttpErrorMapper}, and optionally retries on {@link PodRadarServerException}
+ * with exponential backoff.
+ *
+ * <p>Async variants run the same blocking pipeline (including retries/backoff) on a
+ * lazily-created daemon thread pool; call {@link #close()} to shut it down eagerly.
  */
 public final class HttpExecutor {
     private final SdkConfig cfg;
-    private final HttpClient client;
+    private volatile ExecutorService asyncPool;
 
     public HttpExecutor(SdkConfig cfg) {
         this.cfg = cfg;
-        this.client = HttpClient.newBuilder()
-                .connectTimeout(cfg.connectTimeout())
-                .followRedirects(HttpClient.Redirect.NEVER)
-                .build();
     }
 
     public String getJson(String path) {
-        return execute(buildJsonRequest(path, "GET", null));
+        return execute(new Request(path, "GET", null, null, true));
     }
 
     public String postJson(String path, String body) {
-        return execute(buildJsonRequest(path, "POST", body));
+        return execute(jsonRequest(path, "POST", body));
     }
 
     public String putJson(String path, String body) {
-        return execute(buildJsonRequest(path, "PUT", body));
+        return execute(jsonRequest(path, "PUT", body));
     }
 
     public String deleteJson(String path) {
-        return execute(buildJsonRequest(path, "DELETE", null));
+        return execute(new Request(path, "DELETE", null, null, true));
     }
 
     public String postMultipart(String path, Multipart form) {
-        HttpRequest req = baseRequest(path)
-                .header("Content-Type", form.contentType())
-                .POST(HttpRequest.BodyPublishers.ofByteArray(form.body()))
-                .build();
-        return execute(req);
+        return execute(new Request(path, "POST", form.body(), form.contentType(), false));
     }
 
     public CompletableFuture<String> getJsonAsync(String path) {
-        return executeAsync(buildJsonRequest(path, "GET", null));
+        return executeAsync(new Request(path, "GET", null, null, true));
     }
 
     public CompletableFuture<String> postJsonAsync(String path, String body) {
-        return executeAsync(buildJsonRequest(path, "POST", body));
+        return executeAsync(jsonRequest(path, "POST", body));
     }
 
     public CompletableFuture<String> putJsonAsync(String path, String body) {
-        return executeAsync(buildJsonRequest(path, "PUT", body));
+        return executeAsync(jsonRequest(path, "PUT", body));
     }
 
     public CompletableFuture<String> deleteJsonAsync(String path) {
-        return executeAsync(buildJsonRequest(path, "DELETE", null));
+        return executeAsync(new Request(path, "DELETE", null, null, true));
     }
 
     public CompletableFuture<String> postMultipartAsync(String path, Multipart form) {
-        HttpRequest req = baseRequest(path)
-                .header("Content-Type", form.contentType())
-                .POST(HttpRequest.BodyPublishers.ofByteArray(form.body()))
-                .build();
-        return executeAsync(req);
+        return executeAsync(new Request(path, "POST", form.body(), form.contentType(), false));
     }
 
-    private HttpRequest buildJsonRequest(String path, String method, String body) {
-        HttpRequest.Builder b = baseRequest(path)
-                .header("Accept", "application/json");
-        if (body != null) {
-            b.header("Content-Type", "application/json; charset=utf-8");
-        }
-        HttpRequest.BodyPublisher publisher = body == null
-                ? HttpRequest.BodyPublishers.noBody()
-                : HttpRequest.BodyPublishers.ofString(body, StandardCharsets.UTF_8);
-        switch (method) {
-            case "GET":    return b.GET().build();
-            case "POST":   return b.POST(publisher).build();
-            case "PUT":    return b.PUT(publisher).build();
-            case "DELETE": return b.DELETE().build();
-            default: throw new IllegalArgumentException("unsupported method " + method);
-        }
+    private Request jsonRequest(String path, String method, String body) {
+        byte[] bytes = body == null ? null : body.getBytes(StandardCharsets.UTF_8);
+        String contentType = body == null ? null : "application/json; charset=utf-8";
+        return new Request(path, method, bytes, contentType, true);
     }
 
-    private HttpRequest.Builder baseRequest(String path) {
-        URI uri = resolve(cfg.endpoint(), path);
-        return HttpRequest.newBuilder(uri)
-                .timeout(cfg.requestTimeout())
-                .header("X-API-Key", cfg.apiKey())
-                .header("User-Agent", cfg.userAgent());
+    /** Immutable request descriptor (replayable across retries, unlike a live connection). */
+    private static final class Request {
+        final String path;
+        final String method;
+        final byte[] body;
+        final String contentType;
+        final boolean acceptJson;
+
+        Request(String path, String method, byte[] body, String contentType, boolean acceptJson) {
+            this.path = path;
+            this.method = method;
+            this.body = body;
+            this.contentType = contentType;
+            this.acceptJson = acceptJson;
+        }
     }
 
     private static URI resolve(URI base, String path) {
@@ -112,17 +107,16 @@ public final class HttpExecutor {
         return URI.create(b + path);
     }
 
-    private String execute(HttpRequest req) {
+    private String execute(Request req) {
         int attempts = cfg.retryOnServerError() ? cfg.maxRetries() + 1 : 1;
         PodRadarException lastServerException = null;
         for (int i = 0; i < attempts; i++) {
             try {
-                HttpResponse<String> resp = client.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
-                int status = resp.statusCode();
-                if (status >= 200 && status < 300) {
-                    return resp.body();
+                Response resp = send(req);
+                if (resp.status >= 200 && resp.status < 300) {
+                    return resp.body;
                 }
-                PodRadarException ex = HttpErrorMapper.map(status, resp.headers(), resp.body());
+                PodRadarException ex = HttpErrorMapper.map(resp.status, resp.headers, resp.body);
                 if (ex instanceof PodRadarServerException && i < attempts - 1) {
                     lastServerException = ex;
                     sleepBackoff(i);
@@ -135,9 +129,6 @@ public final class HttpExecutor {
                     continue;
                 }
                 throw new PodRadarNetworkException(e.getMessage() == null ? e.toString() : e.getMessage(), e);
-            } catch (InterruptedException e) {
-                Thread.currentThread().interrupt();
-                throw new PodRadarNetworkException("interrupted", e);
             }
         }
         throw lastServerException == null
@@ -145,48 +136,102 @@ public final class HttpExecutor {
                 : lastServerException;
     }
 
-    private CompletableFuture<String> executeAsync(HttpRequest req) {
-        return sendWithRetry(req, 0);
+    private CompletableFuture<String> executeAsync(Request req) {
+        CompletableFuture<String> future = new CompletableFuture<>();
+        pool().execute(() -> {
+            try {
+                future.complete(execute(req));
+            } catch (Throwable t) {
+                future.completeExceptionally(t);
+            }
+        });
+        return future;
     }
 
-    private CompletableFuture<String> sendWithRetry(HttpRequest req, int attempt) {
-        int maxAttempts = cfg.retryOnServerError() ? cfg.maxRetries() + 1 : 1;
-        return client.sendAsync(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8))
-                .handle((resp, err) -> new Object[]{resp, err})
-                .thenCompose(pair -> {
-                    @SuppressWarnings("unchecked")
-                    HttpResponse<String> resp = (HttpResponse<String>) pair[0];
-                    Throwable err = (Throwable) pair[1];
-                    if (err != null) {
-                        Throwable cause = err instanceof CompletionException ? err.getCause() : err;
-                        if (attempt < maxAttempts - 1) {
-                            return delayedRetry(req, attempt);
-                        }
-                        CompletableFuture<String> failed = new CompletableFuture<>();
-                        failed.completeExceptionally(new PodRadarNetworkException(
-                                cause.getMessage() == null ? cause.toString() : cause.getMessage(), cause));
-                        return failed;
-                    }
-                    int status = resp.statusCode();
-                    if (status >= 200 && status < 300) {
-                        return CompletableFuture.completedFuture(resp.body());
-                    }
-                    PodRadarException ex = HttpErrorMapper.map(status, resp.headers(), resp.body());
-                    if (ex instanceof PodRadarServerException && attempt < maxAttempts - 1) {
-                        return delayedRetry(req, attempt);
-                    }
-                    CompletableFuture<String> failed = new CompletableFuture<>();
-                    failed.completeExceptionally(ex);
-                    return failed;
-                });
+    /** One blocking HTTP round-trip; status/headers/body fully read before returning. */
+    private Response send(Request req) throws IOException {
+        URL url = new URL(resolve(cfg.endpoint(), req.path).toString());
+        // Not calling disconnect() afterwards keeps the underlying connection eligible
+        // for the JDK's keep-alive pool; all streams are fully read + closed below.
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod(req.method);
+        conn.setConnectTimeout((int) Math.min(cfg.connectTimeout().toMillis(), Integer.MAX_VALUE));
+        // Closest Java 8 analog of java.net.http's per-request timeout: caps each
+        // blocking read, not the whole exchange.
+        conn.setReadTimeout((int) Math.min(cfg.requestTimeout().toMillis(), Integer.MAX_VALUE));
+        conn.setInstanceFollowRedirects(false);
+        conn.setRequestProperty("X-API-Key", cfg.apiKey());
+        conn.setRequestProperty("User-Agent", cfg.userAgent());
+        if (req.acceptJson) {
+            conn.setRequestProperty("Accept", "application/json");
+        }
+        if (req.body != null) {
+            if (req.contentType != null) {
+                conn.setRequestProperty("Content-Type", req.contentType);
+            }
+            conn.setDoOutput(true);
+            conn.setFixedLengthStreamingMode(req.body.length);
+            try (OutputStream out = conn.getOutputStream()) {
+                out.write(req.body);
+            }
+        }
+
+        int status = conn.getResponseCode();
+        InputStream in = status >= 400 ? conn.getErrorStream() : conn.getInputStream();
+        String body = in == null ? "" : readAll(in);
+        Map<String, List<String>> headers = conn.getHeaderFields();
+        return new Response(status, headers == null ? Collections.emptyMap() : headers, body);
     }
 
-    private CompletableFuture<String> delayedRetry(HttpRequest req, int attempt) {
-        long delayMs = backoffMillis(attempt);
-        CompletableFuture<Void> delay = new CompletableFuture<>();
-        java.util.concurrent.CompletableFuture.delayedExecutor(delayMs, java.util.concurrent.TimeUnit.MILLISECONDS)
-                .execute(() -> delay.complete(null));
-        return delay.thenCompose(v -> sendWithRetry(req, attempt + 1));
+    private static String readAll(InputStream in) throws IOException {
+        try {
+            ByteArrayOutputStream buf = new ByteArrayOutputStream();
+            byte[] chunk = new byte[8192];
+            int n;
+            while ((n = in.read(chunk)) != -1) {
+                buf.write(chunk, 0, n);
+            }
+            return new String(buf.toByteArray(), StandardCharsets.UTF_8);
+        } finally {
+            in.close();
+        }
+    }
+
+    private static final class Response {
+        final int status;
+        final Map<String, List<String>> headers;
+        final String body;
+
+        Response(int status, Map<String, List<String>> headers, String body) {
+            this.status = status;
+            this.headers = headers;
+            this.body = body;
+        }
+    }
+
+    private ExecutorService pool() {
+        ExecutorService p = asyncPool;
+        if (p == null) {
+            synchronized (this) {
+                if (asyncPool == null) {
+                    asyncPool = Executors.newCachedThreadPool(r -> {
+                        Thread t = new Thread(r, "podradar-sdk-async");
+                        t.setDaemon(true);
+                        return t;
+                    });
+                }
+                p = asyncPool;
+            }
+        }
+        return p;
+    }
+
+    /** Shuts down the async pool if it was ever created. Sync calls remain usable. */
+    public void close() {
+        ExecutorService p = asyncPool;
+        if (p != null) {
+            p.shutdown();
+        }
     }
 
     private static void sleepBackoff(int attempt) {
@@ -202,11 +247,6 @@ public final class HttpExecutor {
         long capped = Math.min(base * (1L << Math.min(attempt, 6)), 5000L);
         long jitter = (long) (Math.random() * 100);
         return capped + jitter;
-    }
-
-    /** Exposes the underlying client for callers that need to share it. */
-    public HttpClient httpClient() {
-        return client;
     }
 
     /** Returns the effective config (read-only). */

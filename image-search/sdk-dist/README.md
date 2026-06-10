@@ -8,7 +8,7 @@ podradar-sdk-0.1.0.jar
 
 ## 环境
 
-需要 JDK 11+。
+需要 JDK 8+。
 
 ```bash
 export POD_RADAR_ENDPOINT="http://10.10.131.205"

@@ -9,6 +9,7 @@ import io.podradar.sdk.model.WriteJobItemsResponse;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.Collections;
 import java.util.List;
 
 /**
@@ -24,7 +25,7 @@ public final class BatchUploadExample {
     private static final int CHUNK = 50;
 
     public static void main(String[] args) throws InterruptedException {
-        List<URI> urls = ExampleSupport.urlsFromArgsOrEnv(args, "POD_RADAR_UPLOAD_URLS", List.of());
+        List<URI> urls = ExampleSupport.urlsFromArgsOrEnv(args, "POD_RADAR_UPLOAD_URLS", Collections.emptyList());
         if (urls.isEmpty()) {
             System.err.println("provide URLs as args or POD_RADAR_UPLOAD_URLS");
             System.exit(ExampleSupport.ERR_USAGE);
