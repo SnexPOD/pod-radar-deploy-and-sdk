@@ -85,14 +85,13 @@ The Docker stack does not start MinIO. Configure an external S3-compatible objec
 | --- | --- | --- | --- |
 | `S3_PROVIDER` | Yes | `s3` | Storage provider mode. Use `s3` for external S3-compatible storage. |
 | `S3_URL_STYLE` | Yes | `virtual-hosted` | URL style: `virtual-hosted` for AWS-like S3, `path` for path-style endpoints. |
-| `S3_ENDPOINT` | Yes | `https://s3.example.com` | External object-storage endpoint. |
+| `S3_ENDPOINT` | Yes | `https://s3.example.com` | External object-storage endpoint; API object URLs are built from this endpoint. |
 | `S3_REGION` | Yes | `us-east-1` | S3 region. |
 | `S3_ACCESS_KEY_ID` | Yes | `AKIA...` | S3 access key. |
 | `S3_SECRET_ACCESS_KEY` | Yes | `...` | S3 secret key. |
 | `S3_BUCKET_IMAGES` | Yes | `pod-radar-images` | Bucket for original images. |
 | `S3_BUCKET_THUMBS` | Yes | `pod-radar-thumbs` | Bucket for thumbnails. |
 | `S3_BUCKET_DOCS` | Yes | `pod-radar-docs` | Bucket for documents. |
-| `S3_PUBLIC_URL` | No | `https://s3.example.com` | Public base URL when buckets are public. Defaults to `S3_ENDPOINT`. |
 | `S3_BUCKET_ACCESS` | Yes | `public` | `public` returns direct object URLs; `private` returns presigned URLs. |
 
 ### Bootstrap Admin

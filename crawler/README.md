@@ -22,6 +22,30 @@ docker compose -f compose.crawler.yml up -d
 - 现成 jar + Demo：见 [`sdk-dist/`](sdk-dist/)。爬虫 SDK 是**单个自包含 jar**（`crawler-sdk-0.1.0.jar`，已内含 `sdk-core`），`javac -cp crawler-sdk-0.1.0.jar` 即可，详见该目录 `README.md`。
 - 源码 / 自行构建：见仓库根 [`../sdk/`](../sdk/)。
 
+## Item 筛选接口
+
+`GET /api/v1/hihumbird/items` 支持的筛选参数：
+
+| 参数 | 说明 |
+| --- | --- |
+| `run_id` | 限定某个同步 / 重试批次。 |
+| `q` | 模糊搜索商品、SKU、订单等文本。 |
+| `sales_order_no` | 销售订单号。 |
+| `production_batch_code` | 生产批次号。 |
+| `production_order_item_code` | 生产项编码。 |
+| `track_number` | 物流单号 / 物流方式。 |
+| `status_name` | hihumbird 订单状态名称。 |
+| `crawl_status` | 爬取状态：`ok`、`failed`、`partial`、`product_image_failed`、`shipping_label_failed`、`source_image_failed`、`production_image_failed`。 |
+| `created_from` / `created_to` | 订单创建时间范围，对应 hihumbird 原始 `source_data.created`。 |
+| `production_from` / `production_to` | 订单开始生产时间范围，对应 `source_data.begin_production_time`。 |
+| `limit` / `offset` | 分页参数。 |
+
+时间字段均为 epoch milliseconds，闭区间。SDK 使用 `ItemsFilter.withCreatedRange(fromMs, toMs)` / `withProductionRange(fromMs, toMs)`；也可以分别调用 `withCreatedFrom`、`withCreatedTo`、`withProductionFrom`、`withProductionTo`。
+
+`POST /api/v1/hihumbird/retry-failed` 的批量重试请求复用同一组筛选字段。SDK 可用 `RetryFailedKindRequest.of(kind).withFilter(filter)` 直接沿用当前 `ItemsFilter`（会忽略 `crawl_status` 和分页）。
+
 ## 历史订单门（>90 天）
 
 订单项创建超过 `CRAWLER_HISTORY_ORDER_DAYS`（默认 90）天的老订单：自动同步只爬生产图+源图、跳过商品图（无头浏览器）与面单；批量「重试失败」也只重试该天数内的订单。详见 `deploy/README.crawler.md`。
+
+前端“90天内生产项”按自然日传 `created_from`/`created_to`：第 N 天前 `00:00:00.000` 到今天 `23:59:59.999`。“历史生产项”覆盖所有历史页数据，默认不传 `created_to`；只有用户手动选择订单创建日期时才传创建时间范围。

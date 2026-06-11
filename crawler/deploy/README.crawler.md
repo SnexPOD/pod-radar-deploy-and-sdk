@@ -112,13 +112,12 @@ Browserless is still part of this stack because hihumbird product images require
 | --- | --- | --- | --- |
 | `CRAWLER_S3_PROVIDER` | Yes | `s3` | Storage provider mode. Use `s3` for external S3-compatible storage. |
 | `CRAWLER_S3_URL_STYLE` | Yes | `virtual-hosted` | URL style: `virtual-hosted` for AWS-like S3, `path` for path-style endpoints. |
-| `CRAWLER_S3_ENDPOINT` | Yes | `https://s3.example.com` | External object-storage endpoint. |
+| `CRAWLER_S3_ENDPOINT` | Yes | `https://s3.example.com` | External object-storage endpoint; API object URLs are built from this endpoint. |
 | `CRAWLER_S3_REGION` | Yes | `us-east-1` | S3 region. |
 | `CRAWLER_S3_ACCESS_KEY_ID` | Yes | `AKIA...` | S3 access key. |
 | `CRAWLER_S3_SECRET_ACCESS_KEY` | Yes | `...` | S3 secret key. |
 | `CRAWLER_S3_BUCKET_IMAGES` | Yes | `pod-radar-crawler-images` | Bucket for crawler images and label page images. |
 | `CRAWLER_S3_BUCKET_DOCS` | Yes | `pod-radar-crawler-docs` | Bucket for original PDF documents. |
-| `CRAWLER_S3_PUBLIC_URL` | No | `https://s3.example.com` | Public base URL when buckets are public. Defaults to `CRAWLER_S3_ENDPOINT`. |
 | `CRAWLER_BUCKET_ACCESS` | Yes | `public` | `public` returns direct object URLs; `private` returns presigned URLs. |
 
 ### Crawler Admin

@@ -33,6 +33,8 @@ final class ExampleSupport {
     private static final Set<String> OPTIONS_WITH_VALUE = new HashSet<>(Arrays.asList(
             "--batch",
             "--cursor-start-at",
+            "--created-from",
+            "--created-to",
             "--k",
             "--limit",
             "--max-run-span-hours",
@@ -40,6 +42,8 @@ final class ExampleSupport {
             "--min-score",
             "--offset",
             "--production-order-item",
+            "--production-from",
+            "--production-to",
             "--q",
             "--rescan-enabled",
             "--rescan-interval",

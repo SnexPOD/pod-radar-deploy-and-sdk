@@ -209,8 +209,12 @@ class CrawlerClientTest {
                         "\"queued\":1500,\"skipped_no_url\":0,\"reharvest\":true," +
                         "\"batches\":2,\"run_ids\":[500,501]}")));
 
+        ItemsFilter filter = ItemsFilter.empty()
+                .withRunId(372)
+                .withCreatedRange(1781136000000L, 1781222399999L)
+                .withProductionFrom(1781222400000L);
         RetryFailedKindResponse resp = client.retryFailedKind(
-                RetryFailedKindRequest.of(RetryFailedKind.PRODUCT_IMAGE).withRunId(372));
+                RetryFailedKindRequest.of(RetryFailedKind.PRODUCT_IMAGE).withFilter(filter));
 
         assertTrue(resp.isQueued());
         assertEquals("product_image", resp.kind());
@@ -220,7 +224,9 @@ class CrawlerClientTest {
         assertEquals(java.util.Arrays.asList(500L, 501L), resp.runIds());
         assertEquals(500L, resp.runId().getAsLong());
         server.verify(postRequestedFor(urlEqualTo("/api/v1/hihumbird/retry-failed"))
-                .withRequestBody(equalToJson("{\"kind\":\"product_image\",\"run_id\":372}")));
+                .withRequestBody(equalToJson("{\"kind\":\"product_image\",\"run_id\":372,"
+                        + "\"created_from\":1781136000000,\"created_to\":1781222399999,"
+                        + "\"production_from\":1781222400000}")));
     }
 
     @Test
@@ -306,6 +312,8 @@ class CrawlerClientTest {
         ItemsFilter filter = ItemsFilter.empty()
                 .withSalesOrderNo("SO-7")
                 .withCrawlStatus(CrawlStatus.FAILED)
+                .withCreatedRange(1781136000000L, 1781222399999L)
+                .withProductionRange(1781222400000L, 1781308799999L)
                 .withPage(PageQuery.of(10, 20));
 
         ItemsListResponse resp = client.listItems(filter);
@@ -314,6 +322,10 @@ class CrawlerClientTest {
         server.verify(getRequestedFor(urlPathEqualTo("/api/v1/hihumbird/items"))
                 .withQueryParam("sales_order_no", equalTo("SO-7"))
                 .withQueryParam("crawl_status", equalTo("failed"))
+                .withQueryParam("created_from", equalTo("1781136000000"))
+                .withQueryParam("created_to", equalTo("1781222399999"))
+                .withQueryParam("production_from", equalTo("1781222400000"))
+                .withQueryParam("production_to", equalTo("1781308799999"))
                 .withQueryParam("limit", equalTo("10"))
                 .withQueryParam("offset", equalTo("20")));
     }

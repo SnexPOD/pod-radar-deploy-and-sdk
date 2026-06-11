@@ -19,6 +19,10 @@ public final class RetryFailedKindRequest {
     private String productionOrderItemCode;
     private String trackNumber;
     private String statusName;
+    private Long createdFrom;
+    private Long createdTo;
+    private Long productionFrom;
+    private Long productionTo;
 
     private RetryFailedKindRequest(RetryFailedKind kind) {
         this.kind = kind;
@@ -36,6 +40,20 @@ public final class RetryFailedKindRequest {
     public RetryFailedKindRequest withProductionOrderItemCode(String code) { this.productionOrderItemCode = code; return this; }
     public RetryFailedKindRequest withTrackNumber(String num)              { this.trackNumber = num; return this; }
     public RetryFailedKindRequest withStatusName(String name)              { this.statusName = name; return this; }
+    public RetryFailedKindRequest withCreatedFrom(long epochMs)            { this.createdFrom = epochMs; return this; }
+    public RetryFailedKindRequest withCreatedTo(long epochMs)              { this.createdTo = epochMs; return this; }
+    public RetryFailedKindRequest withCreatedRange(long fromMs, long toMs) {
+        this.createdFrom = fromMs;
+        this.createdTo = toMs;
+        return this;
+    }
+    public RetryFailedKindRequest withProductionFrom(long epochMs)         { this.productionFrom = epochMs; return this; }
+    public RetryFailedKindRequest withProductionTo(long epochMs)           { this.productionTo = epochMs; return this; }
+    public RetryFailedKindRequest withProductionRange(long fromMs, long toMs) {
+        this.productionFrom = fromMs;
+        this.productionTo = toMs;
+        return this;
+    }
 
     /** Adopt the filters from an {@link ItemsFilter} ({@code crawl_status} and page are ignored). */
     public RetryFailedKindRequest withFilter(ItemsFilter f) {
@@ -46,6 +64,10 @@ public final class RetryFailedKindRequest {
         this.productionOrderItemCode = f.productionOrderItemCode();
         this.trackNumber = f.trackNumber();
         this.statusName = f.statusName();
+        this.createdFrom = f.createdFrom();
+        this.createdTo = f.createdTo();
+        this.productionFrom = f.productionFrom();
+        this.productionTo = f.productionTo();
         return this;
     }
 
@@ -61,6 +83,10 @@ public final class RetryFailedKindRequest {
         if (productionOrderItemCode != null) o.put("production_order_item_code", productionOrderItemCode);
         if (trackNumber != null) o.put("track_number", trackNumber);
         if (statusName != null) o.put("status_name", statusName);
+        if (createdFrom != null) o.put("created_from", createdFrom);
+        if (createdTo != null) o.put("created_to", createdTo);
+        if (productionFrom != null) o.put("production_from", productionFrom);
+        if (productionTo != null) o.put("production_to", productionTo);
         return o;
     }
 }

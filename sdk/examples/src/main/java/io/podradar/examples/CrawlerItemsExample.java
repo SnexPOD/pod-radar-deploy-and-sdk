@@ -68,6 +68,14 @@ public final class CrawlerItemsExample {
         if (statusName != null) filter.withStatusName(statusName);
         String status = ExampleSupport.option(args, "--status", null);
         if (status != null) filter.withCrawlStatus(parseStatus(status));
+        String createdFrom = ExampleSupport.option(args, "--created-from", null);
+        if (createdFrom != null) filter.withCreatedFrom(ExampleSupport.requiredLong(createdFrom, "--created-from"));
+        String createdTo = ExampleSupport.option(args, "--created-to", null);
+        if (createdTo != null) filter.withCreatedTo(ExampleSupport.requiredLong(createdTo, "--created-to"));
+        String productionFrom = ExampleSupport.option(args, "--production-from", null);
+        if (productionFrom != null) filter.withProductionFrom(ExampleSupport.requiredLong(productionFrom, "--production-from"));
+        String productionTo = ExampleSupport.option(args, "--production-to", null);
+        if (productionTo != null) filter.withProductionTo(ExampleSupport.requiredLong(productionTo, "--production-to"));
 
         ItemsListResponse items = crawler.listItems(filter);
         System.out.printf("items total=%d limit=%d offset=%d runId=%s%n",
@@ -94,8 +102,16 @@ public final class CrawlerItemsExample {
                 return CrawlStatus.FAILED;
             case "partial":
                 return CrawlStatus.PARTIAL;
+            case "product_image_failed":
+                return CrawlStatus.PRODUCT_IMAGE_FAILED;
+            case "shipping_label_failed":
+                return CrawlStatus.SHIPPING_LABEL_FAILED;
+            case "source_image_failed":
+                return CrawlStatus.SOURCE_IMAGE_FAILED;
+            case "production_image_failed":
+                return CrawlStatus.PRODUCTION_IMAGE_FAILED;
             default:
-                System.err.println("--status must be ok, failed, or partial");
+                System.err.println("--status must be ok, failed, partial, product_image_failed, shipping_label_failed, source_image_failed, or production_image_failed");
                 System.exit(ExampleSupport.ERR_USAGE);
                 return null;
         }
@@ -105,7 +121,9 @@ public final class CrawlerItemsExample {
         System.err.println("usage:");
         System.err.println("  CrawlerItemsExample list [--run-id ID] [--q TEXT] [--sales-order SO]");
         System.err.println("      [--batch CODE] [--production-order-item CODE] [--track NO]");
-        System.err.println("      [--status-name NAME] [--status ok|failed|partial] [--limit N] [--offset N]");
+        System.err.println("      [--status-name NAME] [--status ok|failed|partial|product_image_failed|shipping_label_failed|source_image_failed|production_image_failed]");
+        System.err.println("      [--created-from MS] [--created-to MS] [--production-from MS] [--production-to MS]");
+        System.err.println("      [--limit N] [--offset N]");
         System.err.println("  CrawlerItemsExample retry-item <item-id>");
     }
 

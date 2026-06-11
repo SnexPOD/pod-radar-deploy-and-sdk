@@ -17,7 +17,9 @@ import io.podradar.sdk.model.PageQuery;
  *
  * 编译运行见同目录 README.md。命令：
  *   list   [limit]                          列最近的同步 run
- *   items  [ok|failed|partial] [limit]      跨 run 查 item（顺带打印历史订单门天数）
+ *   items  [ok|failed|partial|product_image_failed|shipping_label_failed|source_image_failed|production_image_failed]
+ *          [limit] [created_from_ms] [created_to_ms]
+ *                                           跨 run 查 item（顺带打印历史订单门天数）
  *   start                                   触发一次增量同步 run
  *   retry  <product_image|production_image|source_image|label> [run_id]
  *                                           按类型批量重试失败素材（只重试 N 天内的订单）
@@ -61,6 +63,8 @@ public final class CrawlerDemo {
     private static void items(CrawlerClient crawler, String[] args) {
         ItemsFilter filter = ItemsFilter.empty().withPage(PageQuery.of(intArg(args, 2, 20), 0));
         if (args.length >= 2) filter.withCrawlStatus(parseStatus(args[1]));
+        if (args.length >= 4) filter.withCreatedFrom(longArg(args, 3, "created_from_ms"));
+        if (args.length >= 5) filter.withCreatedTo(longArg(args, 4, "created_to_ms"));
         ItemsListResponse items = crawler.listItems(filter);
         System.out.printf("items total=%d limit=%d offset=%d historyOrderDays=%s%n",
                 items.total(), items.limit(), items.offset(),
@@ -101,13 +105,25 @@ public final class CrawlerDemo {
             case "ok":      return CrawlStatus.OK;
             case "failed":  return CrawlStatus.FAILED;
             case "partial": return CrawlStatus.PARTIAL;
-            default:        return CrawlStatus.FAILED;
+            case "product_image_failed": return CrawlStatus.PRODUCT_IMAGE_FAILED;
+            case "shipping_label_failed": return CrawlStatus.SHIPPING_LABEL_FAILED;
+            case "source_image_failed": return CrawlStatus.SOURCE_IMAGE_FAILED;
+            case "production_image_failed": return CrawlStatus.PRODUCTION_IMAGE_FAILED;
+            default:        throw new IllegalArgumentException("unknown crawl status: " + v);
         }
     }
 
     private static int intArg(String[] args, int idx, int dflt) {
         if (args.length <= idx) return dflt;
         try { return Integer.parseInt(args[idx]); } catch (NumberFormatException e) { return dflt; }
+    }
+
+    private static long longArg(String[] args, int idx, String label) {
+        try {
+            return Long.parseLong(args[idx]);
+        } catch (NumberFormatException e) {
+            throw new IllegalArgumentException(label + " must be epoch ms: " + args[idx]);
+        }
     }
 
     private static String requireEnv(String name) {
@@ -121,7 +137,7 @@ public final class CrawlerDemo {
     private static void usage() {
         System.err.println("usage:");
         System.err.println("  java CrawlerDemo list [limit]");
-        System.err.println("  java CrawlerDemo items [ok|failed|partial] [limit]");
+        System.err.println("  java CrawlerDemo items [ok|failed|partial|product_image_failed|shipping_label_failed|source_image_failed|production_image_failed] [limit] [created_from_ms] [created_to_ms]");
         System.err.println("  java CrawlerDemo start");
         System.err.println("  java CrawlerDemo retry <product_image|production_image|source_image|label> [run_id]");
         System.err.println("  java CrawlerDemo cursor <ISO时间|null>");

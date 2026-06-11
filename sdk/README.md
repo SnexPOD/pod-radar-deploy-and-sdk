@@ -64,6 +64,8 @@ mvn -pl crawler-sdk -am test                 # 爬虫 SDK
 mvn -pl examples -am compile                 # 样例只编译,跑要 endpoint + key
 \`\`\`
 
+爬虫 `GET /api/v1/hihumbird/items` 的订单创建/生产时间筛选可用 `ItemsFilter.withCreatedRange(fromMs, toMs)`、`withProductionRange(fromMs, toMs)`（epoch milliseconds，闭区间）。批量重试 `RetryFailedKindRequest.withFilter(filter)` 会沿用同一组筛选字段，忽略 `crawl_status` 和分页。
+
 ---
 
 ## 3. 模块结构
