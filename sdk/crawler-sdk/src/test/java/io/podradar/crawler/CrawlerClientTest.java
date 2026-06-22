@@ -343,6 +343,18 @@ class CrawlerClientTest {
                 .withRequestBody(equalTo("{}")));
     }
 
+    @Test
+    void retryItemForcePostsForceTrue() {
+        server.stubFor(post(urlEqualTo("/api/v1/hihumbird/items/123/retry"))
+                .willReturn(aResponse().withStatus(202).withBody(
+                        "{\"status\":\"queued\",\"item_id\":123}")));
+
+        ItemRetryResponse resp = client.retryItem(123, true);
+        assertEquals("queued", resp.status());
+        server.verify(postRequestedFor(urlEqualTo("/api/v1/hihumbird/items/123/retry"))
+                .withRequestBody(equalToJson("{\"force\":true}")));
+    }
+
     // ───── keys ───────────────────────────────────────────────────────
 
     @Test

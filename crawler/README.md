@@ -1,6 +1,8 @@
-# hihumbird 爬虫系统 · 部署 + SDK
+# 爬虫系统 · 部署 + SDK
 
 部署爬虫系统 + 接入爬虫 Java SDK。与图搜主系统无关（独立库 / 独立桶 / 独立鉴权）。
+
+爬虫服务带**两个数据源**：**hihumbird**（路由在 `/api/v1/hihumbird/*`，SDK 直接挂在 `CrawlerClient` 上）和 **fangguo 方果ERP**（路由在 `/api/v1/fangguo/*`，SDK 经 `crawler.fangguo()` 子访问器取得）。两源共用同一端点 / API key，类型互相隔离。
 
 ## 部署（Docker Hub 拉取，无需构建）
 
@@ -43,6 +45,22 @@ docker compose -f compose.crawler.yml up -d
 时间字段均为 epoch milliseconds，闭区间。SDK 使用 `ItemsFilter.withCreatedRange(fromMs, toMs)` / `withProductionRange(fromMs, toMs)`；也可以分别调用 `withCreatedFrom`、`withCreatedTo`、`withProductionFrom`、`withProductionTo`。
 
 `POST /api/v1/hihumbird/retry-failed` 的批量重试请求复用同一组筛选字段。SDK 可用 `RetryFailedKindRequest.of(kind).withFilter(filter)` 直接沿用当前 `ItemsFilter`（会忽略 `crawl_status` 和分页）。
+
+### 方果(fangguo) Item 筛选
+
+方果订单单元的字段与 hihumbird 不同（按订单单元 order_unit 维度），`GET /api/v1/fangguo/items` 的筛选项也更窄，只支持 4 个：
+
+| 参数 | 说明 |
+| --- | --- |
+| `run_id` | 限定某个同步 / 重试批次（不存在时 404）。 |
+| `q` | 模糊搜索 `tid` / `barcode` / `sku_ext_code` / `factory_encode` / `oid` / `store_name` / `shop_name`。 |
+| `ship_status` | 订单发货状态（方果原始字段，自由字符串）。 |
+| `crawl_status` | 爬取状态：`ok` / `failed` / `partial`。 |
+| `limit` / `offset` | 分页参数。 |
+
+返回的 item 字段（`FangguoItem`）：`tid`、`unit_key`、`barcode`、`sku_id` / `sku_ext_code` / `factory_encode`、`cover_task_id` / `cover_status`、`unit_idx` / `unit_total`，外加 `order`（`ship_status` / `store_name` / `shop_name` / `platform_desc` / `trade_id` / `has_package`）、`assets[]`（效果图 / 生产图 / 成品图）、`labels[]`（面单）。SDK 用 `FangguoItemsFilter.empty().withRunId(...) / withQuery(...) / withShipStatus(...) / withCrawlStatus(...) / withPage(...)`。
+
+与 hihumbird 的差异：fangguo **没有** `rescan-pending-labels`、没有按 kind 批量重试、没有 `batch_code`；停止用 `POST /runs/:id/stop`（可带 `pause_auto`）而不是 `stop-retry`。完整 SDK 方法表见仓库根 [`docs/sdk/CRAWLER_SDK.md`](../../docs/sdk/CRAWLER_SDK.md) §4.6。
 
 ## 历史订单门（>90 天）
 

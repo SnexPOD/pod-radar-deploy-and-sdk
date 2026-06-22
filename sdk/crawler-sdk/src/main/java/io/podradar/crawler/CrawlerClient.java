@@ -41,6 +41,7 @@ public final class CrawlerClient implements AutoCloseable {
     private static final String API = "/api/v1";
 
     private final HttpExecutor http;
+    private FangguoApi fangguo;
 
     private CrawlerClient(HttpExecutor http) {
         this.http = http;
@@ -48,6 +49,16 @@ public final class CrawlerClient implements AutoCloseable {
 
     public static Builder builder() {
         return new Builder();
+    }
+
+    /**
+     * Accessor for the fangguo (方果ERP) endpoints under {@code /api/v1/fangguo/*}. Lazily created
+     * and cached; shares this client's connection, endpoint, and API key. The hihumbird methods on
+     * this client are unrelated to fangguo and remain unchanged.
+     */
+    public FangguoApi fangguo() {
+        if (fangguo == null) fangguo = new FangguoApi(http);
+        return fangguo;
     }
 
     // ───── settings ───────────────────────────────────────────────────
@@ -127,8 +138,23 @@ public final class CrawlerClient implements AutoCloseable {
         return ItemsListResponse.fromJson(JsonReader.parseObject(http.getJson(path)));
     }
 
+    /** {@code POST /items/{id}/retry} → re-enqueue this item's FAILED assets/labels. Throws 404. */
     public ItemRetryResponse retryItem(long itemId) {
         String body = http.postJson(API + "/hihumbird/items/" + itemId + "/retry", "{}");
+        return new ItemRetryResponse(JsonReader.parseObject(body));
+    }
+
+    /**
+     * {@code POST /items/{id}/retry} with {@code {"force":true}}. When {@code force} is true the server
+     * re-enqueues ALL of this item's assets + labels regardless of current status (including ones that
+     * already {@code fetched}/{@code downloaded}/{@code converted}), not just failed ones; labels also
+     * drop their cached PDF so it is re-downloaded. {@code force=false} matches {@link #retryItem(long)}.
+     * Throws 404.
+     */
+    public ItemRetryResponse retryItem(long itemId, boolean force) {
+        Map<String, Object> json = new LinkedHashMap<>();
+        json.put("force", force);
+        String body = http.postJson(API + "/hihumbird/items/" + itemId + "/retry", JsonWriter.write(json));
         return new ItemRetryResponse(JsonReader.parseObject(body));
     }
 

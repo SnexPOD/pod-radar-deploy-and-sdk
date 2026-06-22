@@ -104,6 +104,52 @@ mvn -pl examples -am exec:java \
   -Dexec.args="dashboard"
 ```
 
+## 爬虫系统 — 方果(fangguo)
+
+方果(方果ERP)是爬虫服务的第二个数据源，端点在 `/api/v1/fangguo/*`，复用同一个 `POD_RADAR_CRAWLER_ENDPOINT` / `POD_RADAR_CRAWLER_KEY`。所有调用走 `crawler.fangguo()` 子访问器，与 hihumbird 方法互不影响。
+
+| 程序 | 覆盖的 SDK 调用 |
+|---|---|
+| `FangguoRunExample.java` | `fangguo().getSettings`、`startRun` incremental/backfill(+`--dry-run`/`--wait`)、`listRuns`、`getRun`、`listRunItems`、`listItems(FangguoItemsFilter)`、`stopRun`、`retryFailedRun`、`retryFailedAll`、`retryItem` |
+
+与 hihumbird 的差异:无 `rescan-pending-labels`、无按 kind 批量重试、无 `batch_code`;停止用 `stop`(可带 `--pause-auto`)而不是 `stop-retry`;跨 run 查 item 只支持 `run_id` / `q` / `ship_status` / `crawl_status`。
+
+常用跑法:
+
+```bash
+mvn -pl examples -am exec:java \
+  -Dexec.mainClass=io.podradar.examples.FangguoRunExample \
+  -Dexec.args="settings"
+
+mvn -pl examples -am exec:java \
+  -Dexec.mainClass=io.podradar.examples.FangguoRunExample \
+  -Dexec.args="start-incremental --wait"
+
+mvn -pl examples -am exec:java \
+  -Dexec.mainClass=io.podradar.examples.FangguoRunExample \
+  -Dexec.args="start-backfill 1780780800000 1780867200000 --dry-run"
+
+mvn -pl examples -am exec:java \
+  -Dexec.mainClass=io.podradar.examples.FangguoRunExample \
+  -Dexec.args="list --limit 10"
+
+mvn -pl examples -am exec:java \
+  -Dexec.mainClass=io.podradar.examples.FangguoRunExample \
+  -Dexec.args="items 1234 --limit 20"
+
+mvn -pl examples -am exec:java \
+  -Dexec.mainClass=io.podradar.examples.FangguoRunExample \
+  -Dexec.args="cross-items --q ABC123 --ship-status shipped --crawl-status failed"
+
+mvn -pl examples -am exec:java \
+  -Dexec.mainClass=io.podradar.examples.FangguoRunExample \
+  -Dexec.args="stop 1234 --pause-auto"
+
+mvn -pl examples -am exec:java \
+  -Dexec.mainClass=io.podradar.examples.FangguoRunExample \
+  -Dexec.args="retry-item 56789"
+```
+
 ## 注意
 
 - API key 只从环境变量读取，不要写进源码、日志或脚本参数。

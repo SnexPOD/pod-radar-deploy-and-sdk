@@ -38,6 +38,7 @@ public final class CrawlerAsyncClient implements AutoCloseable {
     private static final String API = "/api/v1";
 
     private final HttpExecutor http;
+    private FangguoAsyncApi fangguo;
 
     private CrawlerAsyncClient(HttpExecutor http) {
         this.http = http;
@@ -47,6 +48,12 @@ public final class CrawlerAsyncClient implements AutoCloseable {
 
     public static CrawlerAsyncClient wrap(CrawlerClient sync) {
         return new CrawlerAsyncClient(sync.http());
+    }
+
+    /** Async accessor for the fangguo endpoints under {@code /api/v1/fangguo/*}; lazily cached. */
+    public FangguoAsyncApi fangguo() {
+        if (fangguo == null) fangguo = new FangguoAsyncApi(http);
+        return fangguo;
     }
 
     // ───── settings ───────────────────────────────────────────────────
@@ -115,6 +122,14 @@ public final class CrawlerAsyncClient implements AutoCloseable {
 
     public CompletableFuture<ItemRetryResponse> retryItem(long itemId) {
         return http.postJsonAsync(API + "/hihumbird/items/" + itemId + "/retry", "{}")
+                .thenApply(b -> new ItemRetryResponse(JsonReader.parseObject(b)));
+    }
+
+    /** {@code force=true} → re-enqueue ALL assets+labels of this item, not just failed (see {@link CrawlerClient#retryItem(long, boolean)}). */
+    public CompletableFuture<ItemRetryResponse> retryItem(long itemId, boolean force) {
+        Map<String, Object> json = new LinkedHashMap<>();
+        json.put("force", force);
+        return http.postJsonAsync(API + "/hihumbird/items/" + itemId + "/retry", JsonWriter.write(json))
                 .thenApply(b -> new ItemRetryResponse(JsonReader.parseObject(b)));
     }
 
