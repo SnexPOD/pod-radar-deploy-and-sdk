@@ -107,6 +107,18 @@ public final class CrawlerAsyncClient implements AutoCloseable {
                 .thenApply(b -> RescanResponse.fromJson(JsonReader.parseObject(b)));
     }
 
+    public CompletableFuture<RescanResponse> rescanMissingBatches() {
+        return http.postJsonAsync(API + "/hihumbird/rescan-missing-batches", "{}")
+                .thenApply(b -> RescanResponse.fromJson(JsonReader.parseObject(b)));
+    }
+
+    public CompletableFuture<RescanResponse> rescanMissingBatches(long accountId) {
+        Map<String, Object> json = new LinkedHashMap<>();
+        json.put("account_id", accountId);
+        return http.postJsonAsync(API + "/hihumbird/rescan-missing-batches", JsonWriter.write(json))
+                .thenApply(b -> RescanResponse.fromJson(JsonReader.parseObject(b)));
+    }
+
     public CompletableFuture<RetryFailedKindResponse> retryFailedKind(RetryFailedKindRequest req) {
         return http.postJsonAsync(API + "/hihumbird/retry-failed", JsonWriter.write(req.toJson()))
                 .thenApply(b -> RetryFailedKindResponse.fromJson(JsonReader.parseObject(b)));

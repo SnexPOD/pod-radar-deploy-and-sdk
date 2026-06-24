@@ -5,8 +5,12 @@ import io.podradar.sdk.internal.Json;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** The 8-field hihumbird sync settings block (shared by {@code GET}/{@code PUT /settings}). */
+/** The 11-field hihumbird sync settings block (shared by {@code GET}/{@code PUT /settings}). */
 public final class HihumbirdSettings {
+    private static final boolean DEFAULT_RESCAN_MISSING_BATCH_ENABLED = true;
+    private static final int DEFAULT_RESCAN_MISSING_BATCH_INTERVAL_MINUTES = 90;
+    private static final int DEFAULT_RESCAN_MISSING_BATCH_MAX_AGE_DAYS = 30;
+
     private final boolean syncEnabled;
     private final int syncIntervalMinutes;
     private final int syncOverlapMinutes;
@@ -15,10 +19,26 @@ public final class HihumbirdSettings {
     private final boolean rescanPendingEnabled;
     private final int rescanPendingIntervalMinutes;
     private final int rescanPendingMaxAgeDays;
+    private final boolean rescanMissingBatchEnabled;
+    private final int rescanMissingBatchIntervalMinutes;
+    private final int rescanMissingBatchMaxAgeDays;
 
     public HihumbirdSettings(boolean syncEnabled, int syncIntervalMinutes, int syncOverlapMinutes,
                              String cursorStartAt, int maxRunSpanHours, boolean rescanPendingEnabled,
                              int rescanPendingIntervalMinutes, int rescanPendingMaxAgeDays) {
+        this(syncEnabled, syncIntervalMinutes, syncOverlapMinutes, cursorStartAt, maxRunSpanHours,
+                rescanPendingEnabled, rescanPendingIntervalMinutes, rescanPendingMaxAgeDays,
+                DEFAULT_RESCAN_MISSING_BATCH_ENABLED,
+                DEFAULT_RESCAN_MISSING_BATCH_INTERVAL_MINUTES,
+                DEFAULT_RESCAN_MISSING_BATCH_MAX_AGE_DAYS);
+    }
+
+    public HihumbirdSettings(boolean syncEnabled, int syncIntervalMinutes, int syncOverlapMinutes,
+                             String cursorStartAt, int maxRunSpanHours, boolean rescanPendingEnabled,
+                             int rescanPendingIntervalMinutes, int rescanPendingMaxAgeDays,
+                             boolean rescanMissingBatchEnabled,
+                             int rescanMissingBatchIntervalMinutes,
+                             int rescanMissingBatchMaxAgeDays) {
         this.syncEnabled = syncEnabled;
         this.syncIntervalMinutes = syncIntervalMinutes;
         this.syncOverlapMinutes = syncOverlapMinutes;
@@ -27,6 +47,9 @@ public final class HihumbirdSettings {
         this.rescanPendingEnabled = rescanPendingEnabled;
         this.rescanPendingIntervalMinutes = rescanPendingIntervalMinutes;
         this.rescanPendingMaxAgeDays = rescanPendingMaxAgeDays;
+        this.rescanMissingBatchEnabled = rescanMissingBatchEnabled;
+        this.rescanMissingBatchIntervalMinutes = rescanMissingBatchIntervalMinutes;
+        this.rescanMissingBatchMaxAgeDays = rescanMissingBatchMaxAgeDays;
     }
 
     public boolean syncEnabled() { return syncEnabled; }
@@ -37,6 +60,9 @@ public final class HihumbirdSettings {
     public boolean rescanPendingEnabled() { return rescanPendingEnabled; }
     public int rescanPendingIntervalMinutes() { return rescanPendingIntervalMinutes; }
     public int rescanPendingMaxAgeDays() { return rescanPendingMaxAgeDays; }
+    public boolean rescanMissingBatchEnabled() { return rescanMissingBatchEnabled; }
+    public int rescanMissingBatchIntervalMinutes() { return rescanMissingBatchIntervalMinutes; }
+    public int rescanMissingBatchMaxAgeDays() { return rescanMissingBatchMaxAgeDays; }
 
     public static HihumbirdSettings fromJson(Map<String, Object> o) {
         return new HihumbirdSettings(
@@ -47,7 +73,12 @@ public final class HihumbirdSettings {
                 Json.integ(o, "max_run_span_hours"),
                 Json.bool(o, "rescan_pending_enabled"),
                 Json.integ(o, "rescan_pending_interval_minutes"),
-                Json.integ(o, "rescan_pending_max_age_days"));
+                Json.integ(o, "rescan_pending_max_age_days"),
+                boolOr(o, "rescan_missing_batch_enabled", DEFAULT_RESCAN_MISSING_BATCH_ENABLED),
+                intOr(o, "rescan_missing_batch_interval_minutes",
+                        DEFAULT_RESCAN_MISSING_BATCH_INTERVAL_MINUTES),
+                intOr(o, "rescan_missing_batch_max_age_days",
+                        DEFAULT_RESCAN_MISSING_BATCH_MAX_AGE_DAYS));
     }
 
     public Map<String, Object> toJson() {
@@ -60,6 +91,17 @@ public final class HihumbirdSettings {
         o.put("rescan_pending_enabled", rescanPendingEnabled);
         o.put("rescan_pending_interval_minutes", rescanPendingIntervalMinutes);
         o.put("rescan_pending_max_age_days", rescanPendingMaxAgeDays);
+        o.put("rescan_missing_batch_enabled", rescanMissingBatchEnabled);
+        o.put("rescan_missing_batch_interval_minutes", rescanMissingBatchIntervalMinutes);
+        o.put("rescan_missing_batch_max_age_days", rescanMissingBatchMaxAgeDays);
         return o;
+    }
+
+    private static boolean boolOr(Map<String, Object> o, String key, boolean fallback) {
+        return o.containsKey(key) ? Json.bool(o, key) : fallback;
+    }
+
+    private static int intOr(Map<String, Object> o, String key, int fallback) {
+        return o.containsKey(key) ? Json.integ(o, key) : fallback;
     }
 }

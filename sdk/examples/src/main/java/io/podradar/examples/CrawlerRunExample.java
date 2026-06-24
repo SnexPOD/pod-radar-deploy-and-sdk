@@ -27,6 +27,9 @@ import java.util.List;
  *
  * mvn -pl examples exec:java -Dexec.mainClass=io.podradar.examples.CrawlerRunExample \
  *   -Dexec.args="list"
+ *
+ * mvn -pl examples exec:java -Dexec.mainClass=io.podradar.examples.CrawlerRunExample \
+ *   -Dexec.args="rescan-missing-batches --account-id 9"
  * </pre>
  */
 public final class CrawlerRunExample {
@@ -58,6 +61,9 @@ public final class CrawlerRunExample {
                     break;
                 case "rescan-pending":
                     rescanPending(crawler);
+                    break;
+                case "rescan-missing-batches":
+                    rescanMissingBatches(crawler, args);
                     break;
                 default:
                     usage();
@@ -161,6 +167,19 @@ public final class CrawlerRunExample {
                 resp.itemCount().isPresent() ? resp.itemCount().getAsInt() : "-");
     }
 
+    private static void rescanMissingBatches(CrawlerClient crawler, String[] args) {
+        String accountId = ExampleSupport.option(args, "--account-id", null);
+        RescanResponse resp = accountId == null
+                ? crawler.rescanMissingBatches()
+                : crawler.rescanMissingBatches(ExampleSupport.requiredLong(accountId, "account-id"));
+        System.out.printf("missing-batch rescan runId=%d status=%s itemCount=%s%n",
+                resp.runId(), resp.status(),
+                resp.itemCount().isPresent() ? resp.itemCount().getAsInt() : "-");
+        if (resp.isQueued()) {
+            System.out.println("queued: another hihumbird sync is active; the server will run this after the lock is free");
+        }
+    }
+
     private static void usage() {
         System.err.println("usage:");
         System.err.println("  CrawlerRunExample start-incremental [--wait]");
@@ -169,6 +188,7 @@ public final class CrawlerRunExample {
         System.err.println("  CrawlerRunExample items <run-id> [--limit N] [--offset N]");
         System.err.println("  CrawlerRunExample retry-failed-run <run-id>");
         System.err.println("  CrawlerRunExample rescan-pending");
+        System.err.println("  CrawlerRunExample rescan-missing-batches [--account-id ID]");
     }
 
     private CrawlerRunExample() {}

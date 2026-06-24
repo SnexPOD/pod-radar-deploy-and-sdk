@@ -3,6 +3,7 @@ import io.podradar.crawler.model.CrawlStatus;
 import io.podradar.crawler.model.HihumbirdItem;
 import io.podradar.crawler.model.ItemsFilter;
 import io.podradar.crawler.model.ItemsListResponse;
+import io.podradar.crawler.model.RescanResponse;
 import io.podradar.crawler.model.RetryFailedKind;
 import io.podradar.crawler.model.RetryFailedKindRequest;
 import io.podradar.crawler.model.RetryFailedKindResponse;
@@ -23,6 +24,7 @@ import io.podradar.sdk.model.PageQuery;
  *   start                                   触发一次增量同步 run
  *   retry  <product_image|production_image|source_image|label> [run_id]
  *                                           按类型批量重试失败素材（只重试 N 天内的订单）
+ *   rescan-missing-batches [account_id]     重扫无生产批次的本地订单；忙时服务端排队
  *   cursor <ISO时间|null>                    强制游标到某时间 / null=清空
  */
 public final class CrawlerDemo {
@@ -43,6 +45,7 @@ public final class CrawlerDemo {
                 case "items":  items(crawler, args); break;
                 case "start":  start(crawler); break;
                 case "retry":  retry(crawler, args); break;
+                case "rescan-missing-batches": rescanMissingBatches(crawler, args); break;
                 case "cursor": cursor(crawler, args); break;
                 default:
                     usage();
@@ -93,6 +96,17 @@ public final class CrawlerDemo {
         System.out.println("（提示：批量重试只重试创建时间在 historyOrderDays 天内的订单，更早的老订单跳过）");
     }
 
+    private static void rescanMissingBatches(CrawlerClient crawler, String[] args) {
+        RescanResponse r = args.length >= 2
+                ? crawler.rescanMissingBatches(Long.parseLong(args[1]))
+                : crawler.rescanMissingBatches();
+        System.out.printf("missing-batch rescan runId=%d status=%s itemCount=%s%n",
+                r.runId(), r.status(), r.itemCount().isPresent() ? r.itemCount().getAsInt() : "-");
+        if (r.isQueued()) {
+            System.out.println("已排队：当前有 hihumbird 同步在跑，锁释放后服务端会自动执行。");
+        }
+    }
+
     private static void cursor(CrawlerClient crawler, String[] args) {
         if (args.length < 2) { usage(); System.exit(2); }
         String at = "null".equalsIgnoreCase(args[1]) ? null : args[1];
@@ -140,6 +154,7 @@ public final class CrawlerDemo {
         System.err.println("  java CrawlerDemo items [ok|failed|partial|product_image_failed|shipping_label_failed|source_image_failed|production_image_failed] [limit] [created_from_ms] [created_to_ms]");
         System.err.println("  java CrawlerDemo start");
         System.err.println("  java CrawlerDemo retry <product_image|production_image|source_image|label> [run_id]");
+        System.err.println("  java CrawlerDemo rescan-missing-batches [account_id]");
         System.err.println("  java CrawlerDemo cursor <ISO时间|null>");
     }
 

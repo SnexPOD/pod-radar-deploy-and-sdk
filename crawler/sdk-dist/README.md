@@ -38,6 +38,10 @@ java -cp .:crawler-sdk-0.1.0.jar CrawlerDemo start
 java -cp .:crawler-sdk-0.1.0.jar CrawlerDemo retry product_image
 java -cp .:crawler-sdk-0.1.0.jar CrawlerDemo retry label 372
 
+# 重扫无生产批次（忙时服务端排队；可选传 account_id）
+java -cp .:crawler-sdk-0.1.0.jar CrawlerDemo rescan-missing-batches
+java -cp .:crawler-sdk-0.1.0.jar CrawlerDemo rescan-missing-batches 9
+
 # 强制游标到某时间 / 清空
 java -cp .:crawler-sdk-0.1.0.jar CrawlerDemo cursor 2025-09-01T00:00:00+08:00
 java -cp .:crawler-sdk-0.1.0.jar CrawlerDemo cursor null
@@ -85,6 +89,12 @@ RetryFailedKindRequest req = RetryFailedKindRequest
         .withFilter(filter); // 自动带 run/q/订单号/时间范围，忽略 crawl_status 和分页
 
 RetryFailedKindResponse retry = crawler.retryFailedKind(req);
+```
+
+无生产批次重扫只补本地订单元数据（生产批次 / 订单状态），不会入队图片或面单；已有 hihumbird run 在跑时返回 `status=queued`，服务端会在同步锁释放后自动执行：
+
+```java
+RescanResponse rescan = crawler.rescanMissingBatches();
 ```
 
 ## 关于「历史订单门」

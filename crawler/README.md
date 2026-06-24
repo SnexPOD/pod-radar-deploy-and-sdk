@@ -46,6 +46,8 @@ docker compose -f compose.crawler.yml up -d
 
 `POST /api/v1/hihumbird/retry-failed` 的批量重试请求复用同一组筛选字段。SDK 可用 `RetryFailedKindRequest.of(kind).withFilter(filter)` 直接沿用当前 `ItemsFilter`（会忽略 `crawl_status` 和分页）。
 
+`POST /api/v1/hihumbird/rescan-missing-batches` 用于补“已接单但没有生产批次号”的本地订单元数据。SDK 调 `crawler.rescanMissingBatches()`；已有 hihumbird run 在跑时返回 `status=queued`，服务端会排队执行。
+
 ### 方果(fangguo) Item 筛选
 
 方果订单单元的字段与 hihumbird 不同（按订单单元 order_unit 维度），`GET /api/v1/fangguo/items` 的筛选项也更窄，只支持 4 个：

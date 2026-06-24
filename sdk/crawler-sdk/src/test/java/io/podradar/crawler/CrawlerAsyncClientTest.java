@@ -4,6 +4,7 @@ import com.github.tomakehurst.wiremock.WireMockServer;
 import io.podradar.crawler.model.RetryFailedKind;
 import io.podradar.crawler.model.RetryFailedKindRequest;
 import io.podradar.crawler.model.RetryFailedKindResponse;
+import io.podradar.crawler.model.RescanResponse;
 import io.podradar.crawler.model.RunRequest;
 import io.podradar.crawler.model.RunResponse;
 import io.podradar.crawler.model.SettingsResponse;
@@ -47,11 +48,15 @@ class CrawlerAsyncClientTest {
                         "{\"settings\":{\"sync_enabled\":true,\"sync_interval_minutes\":15," +
                         "\"sync_overlap_minutes\":5,\"cursor_start_at\":\"2026-01-01T00:00:00Z\"," +
                         "\"max_run_span_hours\":24,\"rescan_pending_enabled\":true," +
-                        "\"rescan_pending_interval_minutes\":60,\"rescan_pending_max_age_days\":3}," +
+                        "\"rescan_pending_interval_minutes\":60,\"rescan_pending_max_age_days\":3," +
+                        "\"rescan_missing_batch_enabled\":true," +
+                        "\"rescan_missing_batch_interval_minutes\":90," +
+                        "\"rescan_missing_batch_max_age_days\":30}," +
                         "\"state\":{}}")));
 
         SettingsResponse resp = client.getSettings().get();
         assertTrue(resp.settings().syncEnabled());
+        assertEquals(90, resp.settings().rescanMissingBatchIntervalMinutes());
         assertNull(resp.state().lastRunId());
     }
 
@@ -98,6 +103,18 @@ class CrawlerAsyncClientTest {
         assertTrue(resp.isQueued());
         assertEquals(42, resp.queued());
         assertFalse(resp.reharvest());
+    }
+
+    @Test
+    void rescanMissingBatchesAsyncResolves() throws Exception {
+        server.stubFor(post(urlEqualTo("/api/v1/hihumbird/rescan-missing-batches"))
+                .willReturn(aResponse().withStatus(202).withBody(
+                        "{\"status\":\"queued\",\"run_id\":2051,\"item_count\":975}")));
+
+        RescanResponse resp = client.rescanMissingBatches().get();
+        assertTrue(resp.isQueued());
+        assertEquals(2051L, resp.runId());
+        assertEquals(975, resp.itemCount().getAsInt());
     }
 
     @Test

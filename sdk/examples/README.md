@@ -70,7 +70,7 @@ mvn -pl examples -am exec:java \
 
 | 程序 | 覆盖的 SDK 调用 |
 |---|---|
-| `CrawlerRunExample.java` | `startRun` incremental/backfill、`listRuns`、`listRunItems`、`retryFailedRun`、`rescanPendingLabels` |
+| `CrawlerRunExample.java` | `startRun` incremental/backfill、`listRuns`、`listRunItems`、`retryFailedRun`、`rescanPendingLabels`、`rescanMissingBatches` |
 | `CrawlerItemsExample.java` | `listItems(ItemsFilter)` 全部过滤项、`retryItem` |
 | `CrawlerSettingsExample.java` | `getSettings`、`updateSettings`、settings/state 输出 |
 | `CrawlerKeyExample.java` | `me`、`listKeys`、`createKey`、`revokeKey`、`deleteKey` |
@@ -86,6 +86,10 @@ mvn -pl examples -am exec:java \
 mvn -pl examples -am exec:java \
   -Dexec.mainClass=io.podradar.examples.CrawlerRunExample \
   -Dexec.args="start-backfill 1780780800000 1780867200000 --batch B-20260607 --dry-run"
+
+mvn -pl examples -am exec:java \
+  -Dexec.mainClass=io.podradar.examples.CrawlerRunExample \
+  -Dexec.args="rescan-missing-batches --account-id 9"
 
 mvn -pl examples -am exec:java \
   -Dexec.mainClass=io.podradar.examples.CrawlerItemsExample \

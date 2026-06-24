@@ -5,7 +5,11 @@ import io.podradar.sdk.internal.Json;
 import java.util.Map;
 import java.util.OptionalInt;
 
-/** Response of {@code POST /api/v1/hihumbird/rescan-pending-labels}. */
+/**
+ * Response of hihumbird rescan endpoints such as {@code rescan-pending-labels} and
+ * {@code rescan-missing-batches}. A {@code queued} status means another hihumbird sync is active;
+ * the server accepted the request and will run it when the sync lock becomes free.
+ */
 public final class RescanResponse {
     private final String status;
     private final long runId;
@@ -20,6 +24,8 @@ public final class RescanResponse {
     public String status()           { return status; }
     public long runId()              { return runId; }
     public OptionalInt itemCount()   { return itemCount; }
+    public boolean isRunning()       { return "running".equals(status); }
+    public boolean isQueued()        { return "queued".equals(status); }
 
     public static RescanResponse fromJson(Map<String, Object> o) {
         return new RescanResponse(

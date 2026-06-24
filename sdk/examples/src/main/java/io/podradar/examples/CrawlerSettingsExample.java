@@ -16,7 +16,9 @@ import io.podradar.sdk.error.PodRadarException;
  * mvn -pl examples exec:java -Dexec.mainClass=io.podradar.examples.CrawlerSettingsExample \
  *   -Dexec.args="update --sync-enabled true --sync-interval 15 --sync-overlap 60 \
  *       --cursor-start-at 2026-06-01T00:00:00.000Z --max-run-span-hours 24 \
- *       --rescan-enabled true --rescan-interval 60 --rescan-max-age-days 30"
+ *       --rescan-enabled true --rescan-interval 60 --rescan-max-age-days 30 \
+ *       --missing-batch-rescan-enabled true --missing-batch-rescan-interval 90 \
+ *       --missing-batch-rescan-max-age-days 30"
  * </pre>
  */
 public final class CrawlerSettingsExample {
@@ -55,7 +57,10 @@ public final class CrawlerSettingsExample {
                 intRequired(args, "--max-run-span-hours"),
                 boolRequired(args, "--rescan-enabled"),
                 intRequired(args, "--rescan-interval"),
-                intRequired(args, "--rescan-max-age-days"));
+                intRequired(args, "--rescan-max-age-days"),
+                boolRequired(args, "--missing-batch-rescan-enabled"),
+                intRequired(args, "--missing-batch-rescan-interval"),
+                intRequired(args, "--missing-batch-rescan-max-age-days"));
     }
 
     private static void print(SettingsResponse resp) {
@@ -74,6 +79,9 @@ public final class CrawlerSettingsExample {
                 s.cursorStartAt(), s.maxRunSpanHours());
         System.out.printf("         rescanPendingEnabled=%s rescanPendingIntervalMinutes=%d rescanPendingMaxAgeDays=%d%n",
                 s.rescanPendingEnabled(), s.rescanPendingIntervalMinutes(), s.rescanPendingMaxAgeDays());
+        System.out.printf("         rescanMissingBatchEnabled=%s rescanMissingBatchIntervalMinutes=%d rescanMissingBatchMaxAgeDays=%d%n",
+                s.rescanMissingBatchEnabled(), s.rescanMissingBatchIntervalMinutes(),
+                s.rescanMissingBatchMaxAgeDays());
     }
 
     private static String requiredOption(String[] args, String name) {
@@ -104,6 +112,8 @@ public final class CrawlerSettingsExample {
         System.err.println("  CrawlerSettingsExample update --sync-enabled true|false --sync-interval N --sync-overlap N");
         System.err.println("      --cursor-start-at ISO --max-run-span-hours N --rescan-enabled true|false");
         System.err.println("      --rescan-interval N --rescan-max-age-days N");
+        System.err.println("      --missing-batch-rescan-enabled true|false --missing-batch-rescan-interval N");
+        System.err.println("      --missing-batch-rescan-max-age-days N");
     }
 
     private CrawlerSettingsExample() {}

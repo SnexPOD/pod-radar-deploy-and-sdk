@@ -66,7 +66,10 @@ class CrawlerClientTest {
                         "{\"settings\":{\"sync_enabled\":true,\"sync_interval_minutes\":15," +
                         "\"sync_overlap_minutes\":5,\"cursor_start_at\":\"2026-01-01T00:00:00Z\"," +
                         "\"max_run_span_hours\":24,\"rescan_pending_enabled\":true," +
-                        "\"rescan_pending_interval_minutes\":60,\"rescan_pending_max_age_days\":3}," +
+                        "\"rescan_pending_interval_minutes\":60,\"rescan_pending_max_age_days\":3," +
+                        "\"rescan_missing_batch_enabled\":true," +
+                        "\"rescan_missing_batch_interval_minutes\":90," +
+                        "\"rescan_missing_batch_max_age_days\":30}," +
                         "\"state\":{\"last_success_at\":\"2026-06-01T00:00:00Z\"," +
                         "\"last_started_at\":\"2026-06-01T00:00:00Z\",\"last_run_id\":42," +
                         "\"last_success_created_range\":{\"from\":1000,\"to\":2000}}}")));
@@ -74,6 +77,9 @@ class CrawlerClientTest {
         SettingsResponse resp = client.getSettings();
         assertTrue(resp.settings().syncEnabled());
         assertEquals(15, resp.settings().syncIntervalMinutes());
+        assertTrue(resp.settings().rescanMissingBatchEnabled());
+        assertEquals(90, resp.settings().rescanMissingBatchIntervalMinutes());
+        assertEquals(30, resp.settings().rescanMissingBatchMaxAgeDays());
         assertEquals(Long.valueOf(42L), resp.state().lastRunId());
         assertEquals(Long.valueOf(1000L), resp.state().lastSuccessCreatedFrom());
         assertEquals(Long.valueOf(2000L), resp.state().lastSuccessCreatedTo());
@@ -86,10 +92,13 @@ class CrawlerClientTest {
                         "{\"settings\":{\"sync_enabled\":false,\"sync_interval_minutes\":30," +
                         "\"sync_overlap_minutes\":5,\"cursor_start_at\":\"2026-01-01T00:00:00Z\"," +
                         "\"max_run_span_hours\":24,\"rescan_pending_enabled\":false," +
-                        "\"rescan_pending_interval_minutes\":60,\"rescan_pending_max_age_days\":3}}")));
+                        "\"rescan_pending_interval_minutes\":60,\"rescan_pending_max_age_days\":3," +
+                        "\"rescan_missing_batch_enabled\":true," +
+                        "\"rescan_missing_batch_interval_minutes\":90," +
+                        "\"rescan_missing_batch_max_age_days\":30}}")));
 
         HihumbirdSettings in = new HihumbirdSettings(
-                false, 30, 5, "2026-01-01T00:00:00Z", 24, false, 60, 3);
+                false, 30, 5, "2026-01-01T00:00:00Z", 24, false, 60, 3, true, 90, 30);
         HihumbirdSettings out = client.updateSettings(in);
 
         assertFalse(out.syncEnabled());
@@ -97,7 +106,8 @@ class CrawlerClientTest {
         server.verify(putRequestedFor(urlEqualTo("/api/v1/hihumbird/settings"))
                 .withHeader("Content-Type", matching("application/json.*"))
                 .withRequestBody(matchingJsonPath("$.sync_enabled", equalTo("false")))
-                .withRequestBody(matchingJsonPath("$.sync_interval_minutes", equalTo("30"))));
+                .withRequestBody(matchingJsonPath("$.sync_interval_minutes", equalTo("30")))
+                .withRequestBody(matchingJsonPath("$.rescan_missing_batch_interval_minutes", equalTo("90"))));
     }
 
     // ───── runs ───────────────────────────────────────────────────────
@@ -201,6 +211,34 @@ class CrawlerClientTest {
         RescanResponse resp = client.rescanPendingLabels();
         assertEquals(18L, resp.runId());
         assertFalse(resp.itemCount().isPresent());
+    }
+
+    @Test
+    void rescanMissingBatchesQueuesWhenBusy() {
+        server.stubFor(post(urlEqualTo("/api/v1/hihumbird/rescan-missing-batches"))
+                .willReturn(aResponse().withStatus(202).withBody(
+                        "{\"status\":\"queued\",\"run_id\":2051,\"item_count\":975,\"account_id\":null," +
+                        "\"message\":\"hihumbird sync already running; missing-batch rescan queued\"}")));
+
+        RescanResponse resp = client.rescanMissingBatches();
+        assertTrue(resp.isQueued());
+        assertEquals(2051L, resp.runId());
+        assertEquals(975, resp.itemCount().getAsInt());
+        server.verify(postRequestedFor(urlEqualTo("/api/v1/hihumbird/rescan-missing-batches"))
+                .withRequestBody(equalTo("{}")));
+    }
+
+    @Test
+    void rescanMissingBatchesCanBeAccountScoped() {
+        server.stubFor(post(urlEqualTo("/api/v1/hihumbird/rescan-missing-batches"))
+                .willReturn(aResponse().withStatus(202).withBody(
+                        "{\"status\":\"running\",\"run_id\":2064,\"item_count\":12}")));
+
+        RescanResponse resp = client.rescanMissingBatches(9L);
+        assertTrue(resp.isRunning());
+        assertEquals(2064L, resp.runId());
+        server.verify(postRequestedFor(urlEqualTo("/api/v1/hihumbird/rescan-missing-batches"))
+                .withRequestBody(equalToJson("{\"account_id\":9}")));
     }
 
     // ───── kind-scoped retry / stop / cursor ──────────────────────────

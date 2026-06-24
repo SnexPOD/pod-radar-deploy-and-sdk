@@ -34,6 +34,7 @@ final class ExampleSupport {
 
     private static final Set<String> OPTIONS_WITH_VALUE = new HashSet<>(Arrays.asList(
             "--batch",
+            "--account-id",
             "--crawl-status",
             "--cursor-start-at",
             "--created-from",
@@ -51,6 +52,9 @@ final class ExampleSupport {
             "--rescan-enabled",
             "--rescan-interval",
             "--rescan-max-age-days",
+            "--missing-batch-rescan-enabled",
+            "--missing-batch-rescan-interval",
+            "--missing-batch-rescan-max-age-days",
             "--run-id",
             "--sales-order",
             "--ship-status",

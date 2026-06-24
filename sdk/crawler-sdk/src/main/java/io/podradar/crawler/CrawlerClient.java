@@ -115,6 +115,25 @@ public final class CrawlerClient implements AutoCloseable {
     }
 
     /**
+     * Rescan local hihumbird rows that still have no production batch code. The server searches the
+     * upstream order API by order id (chunked by 100) and only backfills order/batch metadata; it
+     * does not enqueue images or labels. If another hihumbird run is active, the request is queued
+     * and the response status is {@code queued}.
+     */
+    public RescanResponse rescanMissingBatches() {
+        String body = http.postJson(API + "/hihumbird/rescan-missing-batches", "{}");
+        return RescanResponse.fromJson(JsonReader.parseObject(body));
+    }
+
+    /** Same as {@link #rescanMissingBatches()}, scoped to one upstream account. */
+    public RescanResponse rescanMissingBatches(long accountId) {
+        Map<String, Object> json = new LinkedHashMap<>();
+        json.put("account_id", accountId);
+        String body = http.postJson(API + "/hihumbird/rescan-missing-batches", JsonWriter.write(json));
+        return RescanResponse.fromJson(JsonReader.parseObject(body));
+    }
+
+    /**
      * Retry all failed assets of one kind within the request's filter (the "重试所有失败X"
      * buttons). Creates {@code status='done'} enqueue-type batch(es); product_image is
      * auto-chunked by 1000 and re-rendered via the headless browser. Returns {@code status="empty"}
