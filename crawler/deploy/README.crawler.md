@@ -126,6 +126,8 @@ Browserless is still part of this stack because hihumbird product images require
 | --- | --- | --- | --- |
 | `CRAWLER_ADMIN_NAME` | Yes | `admin` | Admin name used by the crawler API. |
 | `CRAWLER_ADMIN_KEY` | Yes | `pod-radar_replace_with_a_long_random_value` | Admin API key. Must start with `pod-radar_` and be at least 20 characters. |
+| `CRAWLER_CREDENTIAL_SECRET` | Yes if managing accounts | `<long random value>` | AES-256-GCM key encrypting upstream account credentials in `crawler_accounts`. Required once you manage/crawl accounts via the accounts API. Lose it and every stored account must be re-entered. |
+| `CRAWLER_ADMIN_API_KEYS` | No | `pod-radar_key1,pod-radar_key2` | Optional legacy comma-separated fallback admin keys for multi-key deployments. |
 
 Use `CRAWLER_ADMIN_KEY` as the bootstrap key. For additional operator keys, sign in to the crawler UI and create keys there.
 
@@ -140,13 +142,25 @@ Use `CRAWLER_ADMIN_KEY` as the bootstrap key. For additional operator keys, sign
 
 | Variable | Required | Example | Description |
 | --- | --- | --- | --- |
-| `HIHUMBIRD_USERNAME` | Yes | `147...` | hihumbird account username. |
-| `HIHUMBIRD_PASSWORD` | Yes | `...` | hihumbird account password. |
+| `HIHUMBIRD_USERNAME` | No | `147...` | hihumbird account username. Fallback; accounts are normally managed via the accounts API. |
+| `HIHUMBIRD_PASSWORD` | No | `...` | hihumbird account password. Fallback; see above. |
+| `HIHUMBIRD_BASE_URL` | No | `https://apigw.hihumbird.com` | Upstream API gateway (not the merchant portal). A per-account `base_url` overrides it. |
 | `HIHUMBIRD_GROUP_ID` | Yes | `102420649` | hihumbird login group ID. |
 | `HIHUMBIRD_APP_ID` | Yes | `2572668` | hihumbird app ID. |
 | `HIHUMBIRD_REL_TYPE` | Yes | `2` | hihumbird login relation type. |
 | `HIHUMBIRD_SCENE_ID` | Yes | `1f1o1jf9` | hihumbird login scene ID. |
 | `HIHUMBIRD_CURSOR_START_AT` | No | `2025-05-06T00:00:00+08:00` | Initial incremental cursor start time. |
+
+### Fangguo (方果ERP)
+
+Second crawler source. Auth is a Bearer `accessToken` from login plus a fixed tenant-id header (no HMAC signing).
+
+| Variable | Required | Example | Description |
+| --- | --- | --- | --- |
+| `FANGGUO_USERNAME` | No | `...` | Fangguo account username. Fallback; accounts are normally managed via the accounts API. |
+| `FANGGUO_PASSWORD` | No | `...` | Fangguo account password. Fallback; see above. |
+| `FANGGUO_BASE_URL` | No | `https://fangguo.com/fgapp` | Fangguo API base URL. |
+| `FANGGUO_TENANT_ID` | No | `3062076` | Optional pin for the tenant-id header. The INTERNAL tenant id, NOT the UI 系统编号. If unset, the login response's tenantId is used. |
 
 ### Product-Image Harvest
 
@@ -160,6 +174,7 @@ Use `CRAWLER_ADMIN_KEY` as the bootstrap key. For additional operator keys, sign
 | `HIHUMBIRD_FACTORY_SESSION_JSON` | No | `{...}` | Optional localStorage/cookie dump for factory page session helpers. Runtime login still refreshes token. |
 | `CRAWLER_HARVEST_RENDER_WAIT_MS` | No | `12000` | Max render wait per page. |
 | `CRAWLER_HARVEST_MAX_PAGES` | No | `500` | Safety cap for page traversal. |
+| `CRAWLER_HARVEST_QUIET_MS` | No | `60000` | Idle time with no new images before a harvest page is considered done. |
 | `DOCKER_CRAWLER_HARVEST_SCREENSHOT_DIR` | No | `/app/logs/harvest-shots` | Set to save harvest screenshots from inside the container. Empty disables screenshots. |
 
 ### Worker Tuning
