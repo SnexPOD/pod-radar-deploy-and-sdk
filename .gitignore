@@ -14,5 +14,10 @@ sdk/examples/output/
 .project
 .settings/
 
+# Deploy runtime: local env + bind-mounted data/logs (DB data, secrets — never commit)
+*/deploy/.env
+*/deploy/data/
+*/deploy/logs/
+
 # OS
 .DS_Store

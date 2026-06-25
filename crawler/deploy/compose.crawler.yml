@@ -19,6 +19,7 @@ x-app-common: &app-common
     - ./.env
   volumes:
     - ./logs:/app/logs
+    - ./data/app:/app/data
 
 x-crawler-env: &crawler-env
   TZ: Asia/Shanghai
@@ -49,7 +50,8 @@ services:
     ports:
       - "${CRAWLER_POSTGRES_HOST_BIND:-0.0.0.0}:${CRAWLER_POSTGRES_HOST_PORT:-5545}:5432"
     volumes:
-      - crawler_pgdata:/var/lib/postgresql/data
+      # postgres:17 uses the stock PGDATA path; bind-mount it locally.
+      - ./data/pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-pod_radar} -d pod_radar_crawler"]
       interval: 5s
@@ -166,6 +168,3 @@ services:
           exec sleep infinity
         fi
         exec node node_modules/tsx/dist/cli.mjs src/cli/hihumbird-harvest.ts
-
-volumes:
-  crawler_pgdata:

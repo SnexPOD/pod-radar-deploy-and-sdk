@@ -19,6 +19,7 @@ x-app-common: &app-common
     - ./.env
   volumes:
     - ./logs:/app/logs
+    - ./data/app:/app/data
 
 x-main-env: &main-env
   TZ: Asia/Shanghai
@@ -45,7 +46,9 @@ services:
     ports:
       - "${POSTGRES_HOST_BIND:-0.0.0.0}:${POSTGRES_HOST_PORT:-5544}:5432"
     volumes:
-      - pgdata:/var/lib/postgresql/data
+      # timescaledb-ha keeps PGDATA at /home/postgres/pgdata/data, NOT the stock
+      # /var/lib/postgresql/data — bind-mounting the wrong path silently loses data.
+      - ./data/pgdata:/home/postgres/pgdata/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-pod_radar} -d pod_radar"]
       interval: 5s
@@ -147,6 +150,3 @@ services:
         exec bun run src/cli/search.ts \
           --batch "$${MAIN_SEARCH_BATCH:-4}" \
           --concurrency "$${MAIN_SEARCH_CONCURRENCY:-4}"
-
-volumes:
-  pgdata:
