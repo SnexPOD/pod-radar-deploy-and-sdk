@@ -6,7 +6,7 @@
 
 ```bash
 cd deploy
-cp compose.env.example .env        # 按需改：MAIN_IMAGE、数据库、S3/MinIO、Embedding provider 等
+cp compose.env.example .env        # 按需改：MAIN_IMAGE、数据库、S3/OSS、Embedding provider 等
 docker compose -f compose.yml pull
 docker compose -f compose.yml up -d
 ```

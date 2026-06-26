@@ -2,7 +2,7 @@
 
 This guide covers `compose.yml`, the main image-search system. Treat this directory as a standalone deployment repository.
 
-The Docker stack does not start MinIO. Configure an external S3-compatible object store with `S3_*` variables and create the buckets before starting workers.
+The Docker stack does not start any object storage. Configure an external OSS / S3-compatible object store with `S3_*` variables and create the buckets before starting workers.
 
 ## Services
 

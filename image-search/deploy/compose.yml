@@ -27,9 +27,11 @@ x-main-env: &main-env
   HOST: 0.0.0.0
   PORT: "3001"
   WEB_HOST: 0.0.0.0
-  DATABASE_URL: postgres://${POSTGRES_USER:-pod_radar}:${POSTGRES_PASSWORD:-pod_radar_pass}@pgvector:5432/pod_radar
-  # S3_* intentionally comes from .env. This compose stack does not start
-  # MinIO; point S3_ENDPOINT / credentials at your external object storage.
+  # DB host/port 作变量:默认连内置 pgvector:5432。要整套指向【远程共享库】,
+  # 在 .env 设 POSTGRES_HOST=<远程库IP/域名> POSTGRES_PORT=5544(并按需关掉内置 pgvector)。
+  DATABASE_URL: postgres://${POSTGRES_USER:-pod_radar}:${POSTGRES_PASSWORD:-pod_radar_pass}@${POSTGRES_HOST:-pgvector}:${POSTGRES_PORT:-5432}/pod_radar
+  # S3_* intentionally comes from .env. This compose stack does not start any
+  # object storage; point S3_ENDPOINT / credentials at your OSS / S3-compatible store.
   BACKEND_URL: http://pod-radar-backend:3001
 
 services:
@@ -44,9 +46,9 @@ services:
     ports:
       - "${POSTGRES_HOST_BIND:-0.0.0.0}:${POSTGRES_HOST_PORT:-5544}:5432"
     volumes:
-      # timescaledb-ha keeps PGDATA at /home/postgres/pgdata/data, NOT the stock
+      # timescaledb-ha keeps PGDATA at /var/lib/postgresql/data, NOT the stock
       # /var/lib/postgresql/data — bind-mounting the wrong path silently loses data.
-      - ./data/pgdata:/home/postgres/pgdata/data
+      - ./data/pgdata:/var/lib/postgresql/data
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-pod_radar} -d pod_radar"]
       interval: 5s

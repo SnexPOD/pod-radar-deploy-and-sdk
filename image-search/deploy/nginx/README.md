@@ -7,7 +7,6 @@
 | `/` | main web `127.0.0.1:5174` |
 | `/api/*` | main backend `127.0.0.1:3001` |
 | `/docs`, `/openapi.json` | main backend `127.0.0.1:3001` |
-| `/pod-radar-*/*` | MinIO public object URLs |
 
 ## 系统 Nginx
 
