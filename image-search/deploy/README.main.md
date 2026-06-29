@@ -12,7 +12,8 @@ The Docker stack does not start any object storage. Configure an external OSS / 
 | `main-db-push` | Applies the main database schema at startup. |
 | `pod-radar-backend` | Main API service. |
 | `pod-radar-web` | Main web UI. |
-| `pod-radar-fetcher` | Downloads and stores source images. |
+| `pod-radar-fetcher` | Downloads and stores source images (normal memory; `--max-attempts 2`). |
+| `pod-radar-fetcher-highmem` | High-memory fetcher (`--max-attempts 5`) that picks up oversized images the normal fetcher OOM-crashed on, and helps with normal images otherwise. |
 | `pod-radar-embed-worker` | Embedding worker. Can stay idle with `EMBEDDING_ENABLED=false`. |
 | `pod-radar-search-worker` | Search / duplicate-review worker. |
 
@@ -61,7 +62,7 @@ The Docker stack does not start any object storage. Configure an external OSS / 
 
 | Variable | Required | Example | Description |
 | --- | --- | --- | --- |
-| `MAIN_IMAGE` | No | `codedevin/pod-radar-main:v1.0.0` | Application image used by backend, web, and main workers. |
+| `MAIN_IMAGE` | No | `codedevin/pod-radar-main:v1.0.7` | Application image used by backend, web, and main workers. |
 | `POSTGRES_HOST_BIND` | No | `0.0.0.0` | Host interface for the database port. |
 | `POSTGRES_HOST_PORT` | No | `5544` | Host port mapped to the main database. |
 | `BACKEND_HOST_BIND` | No | `0.0.0.0` | Host interface for the backend API. |
@@ -83,7 +84,8 @@ The Docker stack does not start any object storage. Configure an external OSS / 
 | --- | --- | --- | --- |
 | `S3_PROVIDER` | Yes | `s3` | Storage provider mode. Use `s3` for external S3-compatible storage. |
 | `S3_URL_STYLE` | Yes | `virtual-hosted` | URL style: `virtual-hosted` for AWS-like S3, `path` for path-style endpoints. |
-| `S3_ENDPOINT` | Yes | `https://s3.example.com` | External object-storage endpoint; API object URLs are built from this endpoint. |
+| `S3_ENDPOINT` | Yes | `https://s3.example.com` | External object-storage endpoint; presigned/object URLs are built from this public endpoint. |
+| `S3_INTERNAL_ENDPOINT` | No (recommended on same-region cloud) | `https://oss-cn-hangzhou-internal.aliyuncs.com` | Internal/VPC endpoint used for object read/write (uploads, downloads, proxy). On a same-region cloud host set this for free, unmetered, unthrottled transfer; without it large image uploads go over the public endpoint and can hit the storage server's socket idle timeout. Presigned URLs still use the public `S3_ENDPOINT`. Empty off-cloud. |
 | `S3_REGION` | Yes | `us-east-1` | S3 region. |
 | `S3_ACCESS_KEY_ID` | Yes | `AKIA...` | S3 access key. |
 | `S3_SECRET_ACCESS_KEY` | Yes | `...` | S3 secret key. |
@@ -140,7 +142,12 @@ The Docker stack does not start any object storage. Configure an external OSS / 
 | `MAIN_FETCHER_REPLICAS` | No | `2` | Number of `pod-radar-fetcher` containers. |
 | `MAIN_FETCHER_BATCH` | No | `8` | Rows claimed per fetcher loop. |
 | `MAIN_FETCHER_CONCURRENCY` | No | `8` | Parallel downloads inside one `pod-radar-fetcher` container. Total download parallelism is replicas multiplied by this value. |
-| `FETCHER_HTTP_TIMEOUT` | No | `60` | Original image HTTP download timeout in seconds. Large/slow source images should keep this at 60s or higher. |
+| `MAIN_FETCHER_MEM_LIMIT` | No | `1500m` | Memory cap per normal fetcher container; docker reclaims it when an oversized image's sharp decode OOMs. |
+| `MAIN_FETCHER_MAX_ATTEMPTS` | No | `2` | Normal fetcher stops claiming a row after this many attempts (OOM-crashed on a huge image) so the high-memory fetcher takes over. `attempts >= 5` are reaped as `failed`. Set to 5 to disable routing. |
+| `MAIN_FETCHER_HIGHMEM_LIMIT` | No | `4096m` | Memory cap for `pod-radar-fetcher-highmem` (holds a big image's full sharp decode ~1GB+). Bump to e.g. `8192m` on hosts with very large source images. |
+| `MAIN_HIGHMEM_BATCH` | No | `4` | Rows claimed per loop by the high-memory fetcher. |
+| `MAIN_HIGHMEM_CONCURRENCY` | No | `2` | Parallel downloads in the high-memory fetcher. Kept low so multiple big images don't fill it at once. |
+| `FETCHER_HTTP_TIMEOUT` | No | `120` | Original image HTTP download timeout in seconds. Bump to 120 when many source hosts are slow and you see `TimeoutError` fetch failures (production default). |
 | `MAIN_EMBED_REPLICAS` | No | `2` | Number of `pod-radar-embed-worker` containers. |
 | `MAIN_EMBED_BATCH` | No | `8` | Rows claimed per embed-worker loop. |
 | `MAIN_EMBED_CONCURRENCY` | No | `4` | Parallel embedding requests inside one embed-worker container. |

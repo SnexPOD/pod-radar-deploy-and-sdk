@@ -15,7 +15,10 @@ Browserless is still part of this stack because hihumbird product images require
 | `pod-radar-crawler-api` | Crawler API. |
 | `pod-radar-crawler-web` | Crawler web UI. |
 | `pod-radar-hihumbird-sync` | hihumbird order synchronization scheduler. |
-| `pod-radar-hihumbird-fetcher` | Downloads product images, production images, source images, PDFs, and label images. |
+| `pod-radar-hihumbird-fetcher` | Downloads product images, production images, source images, PDFs, and label images. Normal memory cap; `--max-attempts 2`. |
+| `pod-radar-hihumbird-fetcher-highmem` | Single high-memory hihumbird fetcher (`--max-attempts 5`) that picks up oversized images the normal fetcher OOM-crashed on, and helps with normal images otherwise. |
+| `pod-radar-fangguo-sync` | Fangguo (方果ERP) order synchronization scheduler. |
+| `pod-radar-fangguo-fetcher` | Downloads fangguo assets and label images (public direct links, no headless harvest). |
 | `browserless` | Headless Chromium service used by the product-image harvest worker. |
 | `pod-radar-hihumbird-harvest` | Opens the hihumbird factory page and triggers frontend product-image rendering. |
 
@@ -69,7 +72,7 @@ Browserless is still part of this stack because hihumbird product images require
 
 | Variable | Required | Example | Description |
 | --- | --- | --- | --- |
-| `CRAWLER_IMAGE` | No | `codedevin/pod-radar-crawler:v1.0.0` | Application image used by crawler API, web, sync, fetcher, and harvest workers. |
+| `CRAWLER_IMAGE` | No | `codedevin/pod-radar-crawler:v1.0.7` | Application image used by crawler API, web, sync, fetcher, and harvest workers. |
 | `CRAWLER_POSTGRES_HOST_BIND` | No | `0.0.0.0` | Host interface for the crawler database. |
 | `CRAWLER_POSTGRES_HOST_PORT` | No | `5545` | Host port mapped to the crawler database. |
 | `CRAWLER_API_HOST_BIND` | No | `0.0.0.0` | Host interface for the crawler API. |
@@ -113,7 +116,8 @@ Browserless is still part of this stack because hihumbird product images require
 | --- | --- | --- | --- |
 | `CRAWLER_S3_PROVIDER` | Yes | `s3` | Storage provider mode. Use `s3` for external S3-compatible storage. |
 | `CRAWLER_S3_URL_STYLE` | Yes | `virtual-hosted` | URL style: `virtual-hosted` for AWS-like S3, `path` for path-style endpoints. |
-| `CRAWLER_S3_ENDPOINT` | Yes | `https://s3.example.com` | External object-storage endpoint; API object URLs are built from this endpoint. |
+| `CRAWLER_S3_ENDPOINT` | Yes | `https://s3.example.com` | External object-storage endpoint; presigned/object URLs are built from this public endpoint. |
+| `CRAWLER_S3_INTERNAL_ENDPOINT` | No (recommended on same-region cloud) | `https://oss-cn-hangzhou-internal.aliyuncs.com` | Internal/VPC endpoint for object read/write. On a same-region cloud host set this for free, unmetered, unthrottled transfer; without it large image PUTs go over the public endpoint and time out (socket idle timeout). Presigned URLs still use the public `CRAWLER_S3_ENDPOINT`. Empty off-cloud. |
 | `CRAWLER_S3_REGION` | Yes | `us-east-1` | S3 region. |
 | `CRAWLER_S3_ACCESS_KEY_ID` | Yes | `AKIA...` | S3 access key. |
 | `CRAWLER_S3_SECRET_ACCESS_KEY` | Yes | `...` | S3 secret key. |
@@ -186,6 +190,15 @@ Second crawler source. Auth is a Bearer `accessToken` from login plus a fixed te
 | `HIHUMBIRD_FETCHER_REPLICAS` | No | `6` | Number of `pod-radar-hihumbird-fetcher` containers (matches the PM2 ecosystem's 6 instances). |
 | `HIHUMBIRD_FETCHER_BATCH` | No | `8` | Rows claimed per hihumbird fetcher loop. |
 | `HIHUMBIRD_FETCHER_CONCURRENCY` | No | `8` | Parallel downloads inside one `pod-radar-hihumbird-fetcher` container. Total download parallelism is replicas multiplied by this value. |
+| `HIHUMBIRD_FETCHER_MEM_LIMIT` | No | `1500m` | Memory cap per normal hihumbird fetcher container; docker reclaims a bloated worker when it tops out. |
+| `HIHUMBIRD_FETCHER_MAX_ATTEMPTS` | No | `2` | Max claim attempts for the normal fetcher. An oversized (272MP-class) image OOM-crashes it; after this many attempts it stops claiming the row so the high-memory fetcher takes over. Keep low. |
+| `HIHUMBIRD_FETCHER_HIGHMEM_LIMIT` | No | `4096m` | Memory cap for the single high-memory fetcher (`~2.7×` normal) — holds a big image's full sharp decode (~1GB+). |
+| `HIHUMBIRD_HIGHMEM_BATCH` | No | `4` | Rows claimed per loop by the high-memory fetcher. |
+| `HIHUMBIRD_HIGHMEM_CONCURRENCY` | No | `2` | Parallel downloads in the high-memory fetcher. Kept low so multiple big images don't fill 4G at once. |
+| `FANGGUO_FETCHER_REPLICAS` | No | `2` | Number of `pod-radar-fangguo-fetcher` containers. |
+| `FANGGUO_FETCHER_BATCH` | No | `8` | Rows claimed per fangguo fetcher loop. |
+| `FANGGUO_FETCHER_CONCURRENCY` | No | `8` | Parallel downloads inside one fangguo fetcher. Total = replicas × this value. |
+| `FANGGUO_FETCHER_MEM_LIMIT` | No | `1500m` | Memory cap per fangguo fetcher container. |
 | `CRAWLER_IMAGE_PROCESS_PIXEL_LIMIT` | No | `false` | Decoded `width × height` pixel limit for hihumbird assets. `false` disables sharp's built-in `268402689` pixel guard for trusted print/source images. Use a number to re-enable a hard limit. |
 | `CRAWLER_HISTORY_ORDER_DAYS` | No | `90` | Orders whose item create time is older than this many days only crawl production + source images; product images (headless harvest) and shipping labels are skipped. Forward-only: applies to runs created after the change (tagged `params.history_gate`); existing runs are unaffected. |
 
