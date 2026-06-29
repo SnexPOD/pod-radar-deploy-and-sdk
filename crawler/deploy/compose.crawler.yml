@@ -104,6 +104,7 @@ services:
     <<: *app-common
     environment:
       <<: *crawler-env
+      LOG_FILE: crawler-api
     working_dir: /app/packages/crawler
     depends_on:
       crawler-postgres:
@@ -118,6 +119,7 @@ services:
     <<: *app-common
     environment:
       <<: *crawler-env
+      LOG_FILE: crawler-web
     working_dir: /app/packages/crawler-web
     depends_on:
       pod-radar-crawler-api:
@@ -130,6 +132,7 @@ services:
     <<: *app-common
     environment:
       <<: *crawler-env
+      LOG_FILE: hihumbird-sync
     working_dir: /app/packages/crawler
     depends_on:
       pod-radar-crawler-api:
@@ -143,6 +146,8 @@ services:
     mem_limit: ${HIHUMBIRD_FETCHER_MEM_LIMIT:-1500m}
     environment:
       <<: *crawler-env
+      # 多副本 tee 写同一 hihumbird-fetcher.log(O_APPEND 行级原子、可读可 grep);各副本细分看 docker logs。
+      LOG_FILE: hihumbird-fetcher
     working_dir: /app/packages/crawler
     depends_on:
       pod-radar-crawler-api:
@@ -153,12 +158,14 @@ services:
       - |
         exec bun run src/cli/hihumbird-fetcher.ts \
           --batch "$${HIHUMBIRD_FETCHER_BATCH:-8}" \
-          --concurrency "$${HIHUMBIRD_FETCHER_CONCURRENCY:-8}"
+          --concurrency "$${HIHUMBIRD_FETCHER_CONCURRENCY:-8}" \
+          --max-attempts "$${HIHUMBIRD_FETCHER_MAX_ATTEMPTS:-2}"
 
   pod-radar-hihumbird-harvest:
     <<: *app-common
     environment:
       <<: *crawler-env
+      LOG_FILE: hihumbird-harvest
     working_dir: /app/packages/crawler
     depends_on:
       browserless:
@@ -174,3 +181,60 @@ services:
           exec sleep infinity
         fi
         exec node node_modules/tsx/dist/cli.mjs src/cli/hihumbird-harvest.ts
+
+  # 方果 ERP：assets/labels 是公网直链，无需 headless harvest，只要 sync + fetcher
+  # 两个服务（对齐 pm2 ecosystem.crawler.config.cjs）。此前 compose 漏配这两个，
+  # docker 部署便不跑方果（pm2 部署正常）—— 补上后 docker 与 pm2 行为一致。
+  pod-radar-fangguo-sync:
+    <<: *app-common
+    environment:
+      <<: *crawler-env
+      LOG_FILE: fangguo-sync
+    working_dir: /app/packages/crawler
+    depends_on:
+      pod-radar-crawler-api:
+        condition: service_started
+    command: ["bun", "run", "src/cli/fangguo-sync.ts"]
+
+  pod-radar-fangguo-fetcher:
+    <<: *app-common
+    scale: ${FANGGUO_FETCHER_REPLICAS:-2}
+    mem_limit: ${FANGGUO_FETCHER_MEM_LIMIT:-1500m}
+    environment:
+      <<: *crawler-env
+      LOG_FILE: fangguo-fetcher
+    working_dir: /app/packages/crawler
+    depends_on:
+      pod-radar-crawler-api:
+        condition: service_started
+    command:
+      - /bin/sh
+      - -c
+      - |
+        exec bun run src/cli/fangguo-fetcher.ts \
+          --batch "$${FANGGUO_FETCHER_BATCH:-8}" \
+          --concurrency "$${FANGGUO_FETCHER_CONCURRENCY:-8}"
+
+  # hihumbird 高内存 fetcher：专收「被普通 fetcher 处理崩溃（OOM，多为超大图如 272MP
+  # 源图）≥2 次、普通 fetcher 不再 claim」的行（普通 --max-attempts 2，此处 5，能 claim
+  # attempts 2~4 的）；平时也帮抓普通图。内存 4096m（普通 1500m 的 ~2.7 倍）兜住大图
+  # sharp 全解码（~1GB+）。单实例、低并发（大图重，避免同时多张占满 4G）。attempts>=5
+  # 由 worker 内 reap 判 failed，不再无限重试。
+  pod-radar-hihumbird-fetcher-highmem:
+    <<: *app-common
+    mem_limit: ${HIHUMBIRD_FETCHER_HIGHMEM_LIMIT:-4096m}
+    environment:
+      <<: *crawler-env
+      LOG_FILE: hihumbird-fetcher-highmem
+    working_dir: /app/packages/crawler
+    depends_on:
+      pod-radar-crawler-api:
+        condition: service_started
+    command:
+      - /bin/sh
+      - -c
+      - |
+        exec bun run src/cli/hihumbird-fetcher.ts \
+          --batch "$${HIHUMBIRD_HIGHMEM_BATCH:-4}" \
+          --concurrency "$${HIHUMBIRD_HIGHMEM_CONCURRENCY:-2}" \
+          --max-attempts 5

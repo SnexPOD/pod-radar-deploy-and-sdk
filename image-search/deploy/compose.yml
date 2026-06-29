@@ -33,6 +33,9 @@ x-main-env: &main-env
   # S3_* intentionally comes from .env. This compose stack does not start any
   # object storage; point S3_ENDPOINT / credentials at your OSS / S3-compatible store.
   BACKEND_URL: http://pod-radar-backend:3001
+  # 封住 glibc malloc arena 碎片(默认上限 8×核数)——配合 sharp 处理大图防 RSS 单调
+  # 增长。docker 部署必须在此显式设(对齐 crawler compose),否则容器内不生效。
+  MALLOC_ARENA_MAX: "2"
 
 services:
   pgvector:
@@ -78,6 +81,7 @@ services:
     <<: *app-common
     environment:
       <<: *main-env
+      LOG_FILE: backend
     working_dir: /app/packages/backend
     depends_on:
       pgvector:
@@ -92,6 +96,7 @@ services:
     <<: *app-common
     environment:
       <<: *main-env
+      LOG_FILE: web
     working_dir: /app/packages/web
     depends_on:
       pod-radar-backend:
@@ -103,8 +108,13 @@ services:
   pod-radar-fetcher:
     <<: *app-common
     scale: ${MAIN_FETCHER_REPLICAS:-1}
+    # 普通 fetcher：常规图小内存多并发；遇超大图 sharp 解码 OOM 时由 docker 到顶回收。
+    # --max-attempts 2：同一张图被普通 fetcher 崩 2 次后不再 claim，留给高内存 fetcher。
+    mem_limit: ${MAIN_FETCHER_MEM_LIMIT:-1500m}
     environment:
       <<: *main-env
+      # 多副本会 tee 写同一 fetcher.log(O_APPEND 行级原子、可读可 grep);各副本细分看 docker logs。
+      LOG_FILE: fetcher
     working_dir: /app/packages/workers
     depends_on:
       pod-radar-backend:
@@ -115,13 +125,39 @@ services:
       - |
         exec bun run src/cli/fetch.ts \
           --batch "$${MAIN_FETCHER_BATCH:-8}" \
-          --concurrency "$${MAIN_FETCHER_CONCURRENCY:-8}"
+          --concurrency "$${MAIN_FETCHER_CONCURRENCY:-8}" \
+          --max-attempts "$${MAIN_FETCHER_MAX_ATTEMPTS:-2}" \
+          --oversized-mb "$${MAIN_FETCHER_OVERSIZED_MB:-40}"
+
+  # 高内存 fetcher：专收普通 fetcher OOM 崩 ≥2 次(多为超大源图，如 9685×6142 / 上百MB)
+  # 的行——普通 --max-attempts 2、此处 5，能 claim attempts 2~4 的；平时也帮抓普通图。
+  # 大内存兜住大图 sharp 全解码(~1GB+；主系统源图比爬虫更大，默认 4096m 可按机型调高)。
+  # 单实例、低并发避免多张大图同时占满。attempts≥5 由 worker 内 reapExhausted 判 failed。
+  pod-radar-fetcher-highmem:
+    <<: *app-common
+    mem_limit: ${MAIN_FETCHER_HIGHMEM_LIMIT:-4096m}
+    environment:
+      <<: *main-env
+      LOG_FILE: fetcher-highmem
+    working_dir: /app/packages/workers
+    depends_on:
+      pod-radar-backend:
+        condition: service_started
+    command:
+      - /bin/sh
+      - -c
+      - |
+        exec bun run src/cli/fetch.ts \
+          --batch "$${MAIN_HIGHMEM_BATCH:-4}" \
+          --concurrency "$${MAIN_HIGHMEM_CONCURRENCY:-2}" \
+          --max-attempts 5
 
   pod-radar-embed-worker:
     <<: *app-common
     scale: ${MAIN_EMBED_REPLICAS:-1}
     environment:
       <<: *main-env
+      LOG_FILE: embed
     working_dir: /app/packages/workers
     depends_on:
       pod-radar-backend:
@@ -139,6 +175,7 @@ services:
     scale: ${MAIN_SEARCH_REPLICAS:-1}
     environment:
       <<: *main-env
+      LOG_FILE: search
     working_dir: /app/packages/workers
     depends_on:
       pod-radar-backend:
